@@ -16,7 +16,7 @@ export const reportStatuses = [
 ] as const;
 
 export const reportLanguages = ["zh", "en"] as const;
-export const reportFileLabels = ["report", "model", "chief-approval"] as const;
+export const reportFileLabels = ["report", "report-pdf", "model", "chief-approval"] as const;
 
 export const reportStatusActions = [
   "submit",
