@@ -1,0 +1,32 @@
+# .github/workflows/deploy.yml
+name: 部署到阿里云ECS
+
+on:
+  push:
+    branches: [ "main" ]  # 或 master，根据您的默认分支调整
+  workflow_dispatch:      # 允许手动触发
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    
+    steps:
+      - name: 检出代码
+        uses: actions/checkout@v4
+
+      - name: 通过SSH连接ECS并执行部署
+        uses: appleboy/ssh-action@v1.0.3
+        with:
+          host: ${{ secrets.ECS_HOST }}
+          username: ${{ secrets.ECS_USER }}
+          key: ${{ secrets.ECS_SSH_KEY }}
+          script: |
+            cd /var/www/neolyst/web
+            # 如果是首次部署或需要git clone
+            if [ ! -d ".git" ]; then
+              git clone https://github.com/${{ github.repository }} .
+            else
+              git pull
+            fi
+            # 执行部署脚本
+            /var/www/neolyst/deploy.sh
