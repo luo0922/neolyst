@@ -33,7 +33,7 @@ BEGIN
   LANGUAGE plpgsql
   SECURITY INVOKER
   SET search_path = public
-  AS $$
+  AS $BODY$
   DECLARE
     v_report public.report;
     v_current_version_no integer;
@@ -131,5 +131,5 @@ BEGIN
 
     RETURN v_report;
   END;
-  $$;
+  $BODY$;
 END $$;
