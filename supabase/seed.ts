@@ -44,9 +44,15 @@ const DEFAULT_USERS: UserConfig[] = [
   },
   {
     email: "sa@neolyst.com",
-    password: "Analyst123",
+    password: "Admin123",
     role: "sa",
-    fullName: "Test Senior Analyst",
+    fullName: "SA",
+  },
+  {
+    email: "analyst@neolyst.com",
+    password: "Admin123",
+    role: "analyst",
+    fullName: "Test Analyst",
   },
 ];
 
