@@ -24,11 +24,22 @@ alter table public.analyst drop constraint if exists analyst_region_code_fkey;
 alter table public.region drop column if exists name;
 alter table public.region drop column if exists code;
 
--- 3. Add new columns
-alter table public.region add column name_en text;
-alter table public.region add column name_cn text;
-alter table public.region add column code text;
-alter table public.region add column is_active boolean not null default true;
+-- 3. Add new columns (use DO block to handle if already exists)
+DO $$
+BEGIN
+  IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name = 'region' AND column_name = 'name_en') THEN
+    alter table public.region add column name_en text;
+  END IF;
+  IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name = 'region' AND column_name = 'name_cn') THEN
+    alter table public.region add column name_cn text;
+  END IF;
+  IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name = 'region' AND column_name = 'code') THEN
+    alter table public.region add column code text;
+  END IF;
+  IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name = 'region' AND column_name = 'is_active') THEN
+    alter table public.region add column is_active boolean not null default true;
+  END IF;
+END $$;
 
 -- 4. Seed initial data first (before adding unique constraints)
 insert into public.region (name_en, name_cn, code, is_active) values
@@ -57,10 +68,19 @@ comment on column public.region.name_cn is 'Region Chinese name';
 comment on column public.region.code is 'ISO 3166-1 alpha-2 country/region code';
 comment on column public.region.is_active is 'Whether the region is active';
 
--- 5. Add unique constraints
-alter table public.region add constraint uk_region_name_en unique (name_en);
-alter table public.region add constraint uk_region_name_cn unique (name_cn);
-alter table public.region add constraint uk_region_code unique (code);
+-- 5. Add unique constraints (use DO block to handle if already exists)
+DO $$
+BEGIN
+  IF NOT EXISTS (SELECT 1 FROM pg_constraint WHERE conname = 'uk_region_name_en') THEN
+    alter table public.region add constraint uk_region_name_en unique (name_en);
+  END IF;
+  IF NOT EXISTS (SELECT 1 FROM pg_constraint WHERE conname = 'uk_region_name_cn') THEN
+    alter table public.region add constraint uk_region_name_cn unique (name_cn);
+  END IF;
+  IF NOT EXISTS (SELECT 1 FROM pg_constraint WHERE conname = 'uk_region_code') THEN
+    alter table public.region add constraint uk_region_code unique (code);
+  END IF;
+END $$;
 
 -- 6. Recreate indexes
 create index if not exists idx_region_created_at_desc
