@@ -27,7 +27,7 @@ WHERE EXISTS (
 ALTER TABLE public.template DROP CONSTRAINT IF EXISTS template_uniq_version;
 ALTER TABLE public.template ADD CONSTRAINT template_uniq_version unique (report_type, file_type, version);
 
--- Step 5: 更新部分唯一索引
+-- Step 6: 更新部分唯一索引
 DROP INDEX IF EXISTS template_report_type_file_type_active_idx;
 CREATE UNIQUE INDEX template_report_type_file_type_active_idx
 ON public.template (report_type, file_type)
