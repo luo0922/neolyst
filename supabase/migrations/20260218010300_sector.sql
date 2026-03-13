@@ -1,4 +1,7 @@
--- Sector table, hierarchy guard, indexes, trigger, and RLS.
+-- ============================================================
+-- 行业分类表 (sector)
+-- 依赖：20260218010100_region (通过 self-reference)
+-- ============================================================
 
 create table if not exists public.sector (
   id uuid primary key default gen_random_uuid(),
@@ -16,19 +19,16 @@ create table if not exists public.sector (
   )
 );
 
-create index if not exists idx_sector_level_parent
-  on public.sector(level, parent_id);
-create index if not exists idx_sector_name_en_lower
-  on public.sector(lower(name_en));
-create index if not exists idx_sector_active
-  on public.sector(is_active);
+-- 索引
+create index if not exists idx_sector_level_parent on public.sector(level, parent_id);
+create index if not exists idx_sector_name_en_lower on public.sector(lower(name_en));
+create index if not exists idx_sector_active on public.sector(is_active);
 create unique index if not exists uidx_sector_l1_name_en
-  on public.sector(lower(name_en))
-  where parent_id is null;
+  on public.sector(lower(name_en)) where parent_id is null;
 create unique index if not exists uidx_sector_l2_parent_name_en
-  on public.sector(parent_id, lower(name_en))
-  where parent_id is not null;
+  on public.sector(parent_id, lower(name_en)) where parent_id is not null;
 
+-- 层级验证函数
 create or replace function public.validate_sector_hierarchy()
 returns trigger
 language plpgsql
@@ -69,6 +69,7 @@ begin
 end;
 $$;
 
+-- 触发器
 drop trigger if exists trg_sector_hierarchy on public.sector;
 create trigger trg_sector_hierarchy
 before insert or update on public.sector
@@ -79,19 +80,17 @@ create trigger trg_sector_updated_at
 before update on public.sector
 for each row execute function public.set_updated_at_utc();
 
+-- RLS
 alter table public.sector enable row level security;
 
 drop policy if exists sector_select_authenticated on public.sector;
 create policy sector_select_authenticated
 on public.sector
-for select
-to authenticated
-using (true);
+for select to authenticated using (true);
 
 drop policy if exists sector_write_admin on public.sector;
 create policy sector_write_admin
 on public.sector
-for all
-to authenticated
+for all to authenticated
 using ((auth.jwt()->'app_metadata'->>'role') = 'admin')
 with check ((auth.jwt()->'app_metadata'->>'role') = 'admin');

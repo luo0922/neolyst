@@ -1,3 +1,8 @@
+-- ============================================================
+-- 公司覆盖表 (coverage) 和 覆盖-分析师关系表 (coverage_analyst)
+-- 依赖：20260218010200_analyst, 20260218010300_sector
+-- ============================================================
+
 -- Coverage and coverage_analyst tables, indexes, triggers, and RLS.
 
 create table if not exists public.coverage (
