@@ -16,6 +16,10 @@ drop index if exists idx_region_created_at_desc;
 drop trigger if exists trg_region_updated_at on public.region;
 
 -- 2. Drop old columns (data will be migrated to name_cn)
+-- 2.5. Drop foreign key constraints that depend on region.code
+alter table public.report drop constraint if exists report_region_code_fkey;
+
+-- 3. Drop old columns (data will be migrated to name_cn)
 alter table public.region drop column if exists name;
 alter table public.region drop column if exists code;
 
@@ -65,4 +69,8 @@ create index if not exists idx_region_created_at_desc
 create trigger trg_region_updated_at
 before update on public.region
 for each row execute function public.set_updated_at_utc();
+
+-- 8. Recreate foreign key constraint for report.region_code
+alter table public.report add constraint report_region_code_fkey
+foreign key (region_code) references public.region(code) on delete set null;
 
