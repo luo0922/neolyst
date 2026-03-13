@@ -15,11 +15,13 @@ ALTER TABLE public.template ADD CONSTRAINT template_file_type_check CHECK (file_
 
 -- Step 4: 更新唯一约束
 -- 先删除重复记录（保留 id 最大的那条）
-DELETE FROM public.template
-WHERE id NOT IN (
-  SELECT MAX(id)
-  FROM public.template
-  GROUP BY report_type, file_type, version
+DELETE FROM public.template t1
+WHERE EXISTS (
+  SELECT 1 FROM public.template t2
+  WHERE t2.report_type = t1.report_type
+    AND t2.file_type = t1.file_type
+    AND t2.version = t1.version
+    AND t2.id > t1.id
 );
 
 ALTER TABLE public.template DROP CONSTRAINT IF EXISTS template_uniq_version;
