@@ -5,6 +5,8 @@ alter table public.report drop constraint if exists report_region_id_fkey;
 alter table public.report drop column if exists region_id;
 
 -- 2. Add new region_code column (references region.code)
+-- Drop first if exists (from previous failed attempt)
+alter table public.report drop column if exists region_code;
 alter table public.report add column region_code text references public.region(code) on delete set null;
 
 -- 3. Add comment
