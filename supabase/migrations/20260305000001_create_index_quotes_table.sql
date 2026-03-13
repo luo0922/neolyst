@@ -33,7 +33,12 @@ create index if not exists idx_index_quotes_trade_date on public.index_quotes(tr
 create index if not exists idx_index_quotes_code_date on public.index_quotes(index_code, trade_date);
 
 -- 唯一约束：同一指数在同一交易日只有一条记录
-alter table public.index_quotes add constraint uk_index_quotes_code_date unique (index_code, trade_date);
+DO $$
+BEGIN
+  IF NOT EXISTS (SELECT 1 FROM pg_constraint WHERE conname = 'uk_index_quotes_code_date') THEN
+    alter table public.index_quotes add constraint uk_index_quotes_code_date unique (index_code, trade_date);
+  END IF;
+END $$;
 
 alter table public.index_quotes enable row level security;
 
