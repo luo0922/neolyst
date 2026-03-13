@@ -14,6 +14,14 @@ WHERE file_type NOT IN ('report', 'model')
 ALTER TABLE public.template ADD CONSTRAINT template_file_type_check CHECK (file_type IN ('report', 'model'));
 
 -- Step 4: 更新唯一约束
+-- 先删除重复记录（保留 id 最大的那条）
+DELETE FROM public.template
+WHERE id NOT IN (
+  SELECT MAX(id)
+  FROM public.template
+  GROUP BY report_type, file_type, version
+);
+
 ALTER TABLE public.template DROP CONSTRAINT IF EXISTS template_uniq_version;
 ALTER TABLE public.template ADD CONSTRAINT template_uniq_version unique (report_type, file_type, version);
 
