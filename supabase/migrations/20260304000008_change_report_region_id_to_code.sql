@@ -16,5 +16,6 @@ BEGIN
   END IF;
 END $$;
 
+
 -- 3. Add comment
 comment on column public.report.region_code is 'Region code (ISO 3166-1 alpha-2), references region.code';
