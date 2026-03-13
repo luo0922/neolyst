@@ -41,7 +41,10 @@ BEGIN
   END IF;
 END $$;
 
--- 4. Seed initial data first (before adding unique constraints)
+-- 4. Delete rows with null values before seeding
+delete from public.region where code is null or code = '';
+
+-- 4b. Seed initial data first (before adding unique constraints)
 insert into public.region (name_en, name_cn, code, is_active) values
   ('China', '中国', 'CN', true),
   ('Hong Kong', '香港', 'HK', true),
