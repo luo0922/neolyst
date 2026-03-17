@@ -61,7 +61,8 @@ export async function listRegions(params: {
  * Create a new region with unique validation
  */
 export async function createRegion(params: {
-  name: string;
+  name_en: string;
+  name_cn: string;
   code: string;
 }): Promise<Result<Region>> {
   const supabase = await createServerClient();
@@ -96,7 +97,8 @@ export async function createRegion(params: {
 export async function updateRegion(
   id: string,
   params: {
-    name?: string;
+    name_en?: string;
+    name_cn?: string;
     code?: string;
   },
 ): Promise<Result<Region>> {

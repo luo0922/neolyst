@@ -4,7 +4,7 @@ import { listAllActiveAnalysts } from "@/features/analyst-info/repo/analysts-rep
 import { listCoverages } from "@/features/coverage/repo/coverage-repo";
 import { listAllRatings } from "@/features/ratings/repo/ratings-repo";
 import { listAllRegions } from "@/features/regions/repo/regions-repo";
-import { listAllActiveSectors } from "@/features/sectors/repo/sectors-repo";
+import { listSectorsGroupedAction } from "@/features/sectors/actions";
 import { listUsers } from "@/features/users/repo/users-admin-repo";
 
 import { listReportTypeOptionsAction } from "../actions";
@@ -20,7 +20,7 @@ export async function NewReportPage({ userRole }: NewReportPageProps) {
       listReportTypeOptionsAction(),
       listAllActiveAnalysts(),
       listAllRegions(),
-      listAllActiveSectors(),
+      listSectorsGroupedAction({ is_active: true }),
       listCoverages({ page: 1, query: null }),
       listAllRatings(),
     ]);

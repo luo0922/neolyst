@@ -2,7 +2,7 @@ import * as React from "react";
 
 import { listCoveragesAction } from "../actions";
 import { CoveragePageClient } from "./coverage-page-client";
-import { listAllActiveSectors } from "@/features/sectors/repo/sectors-repo";
+import { listSectorsGroupedAction } from "@/features/sectors/actions";
 import { listAllActiveAnalysts } from "@/features/analyst-info/repo/analysts-repo";
 import { listAllRegions } from "@/features/regions/repo/regions-repo";
 
@@ -23,7 +23,7 @@ export async function CoveragePage({ searchParams, userRole }: CoveragePageProps
 
   const [coveragesResult, sectorsResult, analystsResult, regionsResult] = await Promise.all([
     listCoveragesAction({ page, query, sector_id }),
-    listAllActiveSectors(),
+    listSectorsGroupedAction({ is_active: true }),
     listAllActiveAnalysts(),
     listAllRegions(),
   ]);

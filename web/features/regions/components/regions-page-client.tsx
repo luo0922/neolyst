@@ -52,10 +52,12 @@ export function RegionsPageClient({
   // Create/Edit modal
   const [formOpen, setFormOpen] = React.useState(false);
   const [editingRegion, setEditingRegion] = React.useState<Region | null>(null);
-  const [formName, setFormName] = React.useState("");
+  const [formNameEn, setFormNameEn] = React.useState("");
+  const [formNameCn, setFormNameCn] = React.useState("");
   const [formCode, setFormCode] = React.useState("");
   const [formErrors, setFormErrors] = React.useState<{
-    name?: string;
+    name_en?: string;
+    name_cn?: string;
     code?: string;
   }>({});
   const [formLoading, setFormLoading] = React.useState(false);
@@ -67,7 +69,8 @@ export function RegionsPageClient({
 
   function openCreate() {
     setEditingRegion(null);
-    setFormName("");
+    setFormNameEn("");
+    setFormNameCn("");
     setFormCode("");
     setFormErrors({});
     setFormOpen(true);
@@ -75,7 +78,8 @@ export function RegionsPageClient({
 
   function openEdit(region: Region) {
     setEditingRegion(region);
-    setFormName(region.name_en);
+    setFormNameEn(region.name_en);
+    setFormNameCn(region.name_cn);
     setFormCode(region.code);
     setFormErrors({});
     setFormOpen(true);
@@ -84,19 +88,21 @@ export function RegionsPageClient({
   async function submitForm(e: React.FormEvent) {
     e.preventDefault();
 
-    const name = formName.trim();
+    const name_en = formNameEn.trim();
+    const name_cn = formNameCn.trim();
     const code = formCode.trim();
 
-    const next: { name?: string; code?: string } = {};
-    if (!name) next.name = "Name is required";
+    const next: { name_en?: string; name_cn?: string; code?: string } = {};
+    if (!name_en) next.name_en = "English name is required";
+    if (!name_cn) next.name_cn = "Chinese name is required";
     if (!code) next.code = "Code is required";
     setFormErrors(next);
     if (Object.keys(next).length) return;
 
     setFormLoading(true);
     const res = editingRegion
-      ? await updateRegionAction(editingRegion.id, { name, code })
-      : await createRegionAction({ name, code });
+      ? await updateRegionAction(editingRegion.id, { name_en, name_cn, code })
+      : await createRegionAction({ name_en, name_cn, code });
     setFormLoading(false);
 
     if (!res.ok) {
@@ -165,7 +171,8 @@ export function RegionsPageClient({
         <Table>
           <THead>
             <TR className="hover:bg-transparent">
-              <TH>Name</TH>
+              <TH>Name (EN)</TH>
+              <TH>Name (CN)</TH>
               <TH>Code</TH>
               <TH>Created</TH>
               <TH className="text-right">Actions</TH>
@@ -174,7 +181,7 @@ export function RegionsPageClient({
           <tbody>
             {regions.length === 0 ? (
               <TR className="hover:bg-transparent">
-                <TD colSpan={4} className="py-10 text-center text-[var(--fg-secondary)]">
+                <TD colSpan={5} className="py-10 text-center text-[var(--fg-secondary)]">
                   No regions found
                 </TD>
               </TR>
@@ -182,6 +189,7 @@ export function RegionsPageClient({
               regions.map((region) => (
                 <TR key={region.id}>
                   <TD className="font-medium text-[var(--fg-primary)]">{region.name_en}</TD>
+                  <TD className="text-[var(--fg-secondary)]">{region.name_cn}</TD>
                   <TD>
                     <code className="rounded bg-[var(--bg-surface-hover)] px-1.5 py-0.5 text-xs text-[var(--fg-secondary)]">
                       {region.code}
@@ -239,12 +247,20 @@ export function RegionsPageClient({
       >
         <form id="region-form" className="space-y-3" onSubmit={submitForm}>
           <Input
-            id="name"
-            label="Name"
+            id="name_en"
+            label="Name (English)"
             placeholder="e.g., China"
-            value={formName}
-            onChange={(e) => setFormName(e.target.value)}
-            error={formErrors.name}
+            value={formNameEn}
+            onChange={(e) => setFormNameEn(e.target.value)}
+            error={formErrors.name_en}
+          />
+          <Input
+            id="name_cn"
+            label="Name (Chinese)"
+            placeholder="e.g., 中国"
+            value={formNameCn}
+            onChange={(e) => setFormNameCn(e.target.value)}
+            error={formErrors.name_cn}
           />
           <Input
             id="code"

@@ -21,7 +21,7 @@ import type { Analyst } from "@/features/analyst-info/repo/analysts-repo";
 import type { CoverageWithDetails } from "@/features/coverage/repo/coverage-repo";
 import type { Region } from "@/features/regions/repo/regions-repo";
 import type { Rating } from "@/features/ratings/repo/ratings-repo";
-import type { Sector } from "@/features/sectors/repo/sectors-repo";
+import type { SectorWithChildren } from "@/features/sectors/repo/sectors-repo";
 import {
   type ReportDetail,
   type ReportSummary,
@@ -100,7 +100,7 @@ export interface EditReportPageClientProps {
   reportTypes: string[];
   analysts: Analyst[];
   regions: Region[];
-  sectors: Sector[];
+  sectors: SectorWithChildren[];
   coverages: CoverageWithDetails[];
   ratings: Rating[];
   users: UserRow[];
@@ -794,10 +794,16 @@ export function EditReportPageClient({
               onChange={(event) => setFormSectorId(event.target.value)}
               options={[
                 { value: "", label: "Select sector..." },
-                ...sectors.map((item) => ({
-                  value: item.id,
-                  label: item.name_en,
-                })),
+                ...sectors.flatMap((parent) => [
+                  {
+                    value: parent.id,
+                    label: `${parent.name_en}${parent.name_cn ? ` (${parent.name_cn})` : ""}`,
+                  },
+                  ...parent.children.map((child) => ({
+                    value: child.id,
+                    label: `\u00A0\u00A0\u00A0\u00A0${child.name_en}${child.name_cn ? ` (${child.name_cn})` : ""}`,
+                  })),
+                ]),
               ]}
               disabled={!canEdit}
             />

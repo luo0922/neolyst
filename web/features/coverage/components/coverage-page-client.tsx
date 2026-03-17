@@ -19,7 +19,7 @@ import {
   updateCoverageAction,
 } from "../actions";
 import type { CoverageWithDetails } from "../repo/coverage-repo";
-import type { Sector } from "@/features/sectors/repo/sectors-repo";
+import type { SectorWithChildren } from "@/features/sectors/repo/sectors-repo";
 import type { Analyst } from "@/features/analyst-info/repo/analysts-repo";
 import type { Region } from "@/features/regions/repo/regions-repo";
 
@@ -30,7 +30,7 @@ export interface CoveragePageClientProps {
   totalPages: number;
   currentQuery: string | null;
   currentSectorId: string | null;
-  sectors: Sector[];
+  sectors: SectorWithChildren[];
   analysts: Analyst[];
   regions: Region[];
   userRole: "admin" | "sa" | "analyst";
@@ -370,10 +370,16 @@ export function CoveragePageClient({
                 onChange={(e) => handleSectorChange(e.target.value)}
                 options={[
                   { value: "", label: "All sectors" },
-                  ...sectors.map((s) => ({
-                    value: s.id,
-                    label: `${s.level === 1 ? "" : "  "}${s.name_en}`,
-                  })),
+                  ...sectors.flatMap((parent) => [
+                    {
+                      value: parent.id,
+                      label: `${parent.name_en}${parent.name_cn ? ` (${parent.name_cn})` : ""}`,
+                    },
+                    ...parent.children.map((child) => ({
+                      value: child.id,
+                      label: `\u00A0\u00A0\u00A0\u00A0${child.name_en}${child.name_cn ? ` (${child.name_cn})` : ""}`,
+                    })),
+                  ]),
                 ]}
               />
             </div>
@@ -533,10 +539,16 @@ export function CoveragePageClient({
               onChange={(e) => setFormSectorId(e.target.value)}
               options={[
                 { value: "", label: "Select sector..." },
-                ...sectors.map((s) => ({
-                  value: s.id,
-                  label: `${s.level === 1 ? "" : "  "}${s.name_en}`,
-                })),
+                ...sectors.flatMap((parent) => [
+                  {
+                    value: parent.id,
+                    label: `${parent.name_en}${parent.name_cn ? ` (${parent.name_cn})` : ""}`,
+                  },
+                  ...parent.children.map((child) => ({
+                    value: child.id,
+                    label: `\u00A0\u00A0${child.name_en}${child.name_cn ? ` (${child.name_cn})` : ""}`,
+                  })),
+                ]),
               ]}
               error={formErrors.sector}
             />

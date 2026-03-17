@@ -28,6 +28,7 @@ const PAGE_SIZE = 15;
  * List all sectors grouped by level with children
  */
 export async function listSectorsGrouped(params?: {
+  query?: string;
   level?: 1 | 2;
   is_active?: boolean;
 }): Promise<Result<SectorWithChildren[]>> {
@@ -36,7 +37,14 @@ export async function listSectorsGrouped(params?: {
   let query = supabase
     .from("sector")
     .select("*")
+    .order("level", { ascending: true })
     .order("name_en", { ascending: true });
+
+  // Apply search filter
+  if (params?.query) {
+    const searchTerm = `%${params.query}%`;
+    query = query.or(`name_en.ilike.${searchTerm},name_cn.ilike.${searchTerm}`);
+  }
 
   if (params?.level) {
     query = query.eq("level", params.level);
@@ -59,6 +67,27 @@ export async function listSectorsGrouped(params?: {
     ...parent,
     children: level2Sectors.filter((child) => child.parent_id === parent.id),
   }));
+
+  // If searching, also include orphaned level 2 sectors (no parent)
+  if (params?.query) {
+    const orphanedLevel2 = level2Sectors.filter(
+      (child) => !level1Sectors.some((parent) => parent.id === child.parent_id),
+    );
+    if (orphanedLevel2.length > 0) {
+      result.push({
+        id: "orphaned",
+        level: 1,
+        parent_id: null,
+        name_en: "(No Parent)",
+        name_cn: "(无父级)",
+        wind_name: null,
+        is_active: true,
+        created_at: "",
+        updated_at: "",
+        children: orphanedLevel2,
+      });
+    }
+  }
 
   return ok(result);
 }

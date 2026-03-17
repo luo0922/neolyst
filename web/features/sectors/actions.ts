@@ -47,6 +47,7 @@ export async function listSectorsAction(input: {
  * List all sectors grouped by level (with children)
  */
 export async function listSectorsGroupedAction(params?: {
+  query?: string;
   level?: 1 | 2;
   is_active?: boolean;
 }): Promise<Result<SectorWithChildren[]>> {

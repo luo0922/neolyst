@@ -8,7 +8,6 @@ import { Button } from "@/components/ui/button";
 import { ConfirmModal } from "@/components/ui/confirm-modal";
 import { Input } from "@/components/ui/input";
 import { Modal } from "@/components/ui/modal";
-import { Pagination } from "@/components/ui/pagination";
 import { Select } from "@/components/ui/select";
 import { Table, TD, TH, THead, TR } from "@/components/ui/table";
 import { useToast } from "@/components/ui/toast";
@@ -19,46 +18,24 @@ import {
   listLevel1SectorsAction,
   updateSectorAction,
 } from "../actions";
-import type { Sector } from "../repo/sectors-repo";
+import type { Sector, SectorWithChildren } from "../repo/sectors-repo";
 
 export interface SectorsPageClientProps {
-  sectors: Sector[];
-  total: number;
-  page: number;
-  totalPages: number;
+  sectors: SectorWithChildren[];
   currentQuery: string | null;
-  currentLevel?: 1 | 2;
-}
-
-function toQueryString(params: { q: string; page: number; level?: string }) {
-  const q = params.q.trim();
-  const sp = new URLSearchParams();
-  if (q) sp.set("query", q);
-  if (params.page > 1) sp.set("page", String(params.page));
-  if (params.level) sp.set("level", params.level);
-  const s = sp.toString();
-  return s ? `?${s}` : "";
 }
 
 export function SectorsPageClient({
   sectors,
-  total,
-  page,
-  totalPages,
   currentQuery,
-  currentLevel,
 }: SectorsPageClientProps) {
   const router = useRouter();
   const toast = useToast();
 
   const [queryDraft, setQueryDraft] = React.useState(currentQuery ?? "");
-  const [levelFilter, setLevelFilter] = React.useState<string>(
-    currentLevel?.toString() ?? "",
-  );
   React.useEffect(() => {
     setQueryDraft(currentQuery ?? "");
-    setLevelFilter(currentLevel?.toString() ?? "");
-  }, [currentQuery, currentLevel]);
+  }, [currentQuery]);
 
   // Level-1 sectors for parent selection
   const [level1Sectors, setLevel1Sectors] = React.useState<Sector[]>([]);
@@ -174,31 +151,13 @@ export function SectorsPageClient({
     router.refresh();
   }
 
-  function doSearch() {
-    router.push(
-      `/sectors${toQueryString({ q: queryDraft, page: 1, level: levelFilter || undefined })}`,
-    );
-  }
-
   function submitSearch(e: React.FormEvent) {
     e.preventDefault();
-    doSearch();
+    router.push(`/sectors${queryDraft ? `?query=${encodeURIComponent(queryDraft)}` : ""}`);
   }
 
-  // Auto-search when filter changes
-  function handleLevelChange(value: string) {
-    setLevelFilter(value);
-    router.push(
-      `/sectors${toQueryString({ q: queryDraft, page: 1, level: value || undefined })}`,
-    );
-  }
-
-  // Find parent name for level-2 sectors
-  function getParentName(parentId: string | null): string {
-    if (!parentId) return "-";
-    const parent = level1Sectors.find((s) => s.id === parentId);
-    return parent?.name_en ?? "-";
-  }
+  // Calculate total count
+  const totalCount = sectors.reduce((acc, parent) => acc + 1 + parent.children.length, 0);
 
   return (
     <div className="min-h-screen">
@@ -211,30 +170,16 @@ export function SectorsPageClient({
 
       <main className="mx-auto max-w-7xl space-y-4 px-6 py-8">
         <div className="flex items-end justify-between gap-4">
-          <form className="flex flex-1 gap-4" onSubmit={submitSearch}>
-            <div className="w-full max-w-md">
-              <Input
-                label="Search"
-                placeholder="Search by name"
-                value={queryDraft}
-                onChange={(e) => setQueryDraft(e.target.value)}
-              />
-            </div>
-            <div className="w-40">
-              <Select
-                label="Level"
-                value={levelFilter}
-                onChange={(e) => handleLevelChange(e.target.value)}
-                options={[
-                  { value: "", label: "All" },
-                  { value: "1", label: "Level 1" },
-                  { value: "2", label: "Level 2" },
-                ]}
-              />
-            </div>
+          <form className="w-full max-w-md" onSubmit={submitSearch}>
+            <Input
+              label="Search"
+              placeholder="Search by name"
+              value={queryDraft}
+              onChange={(e) => setQueryDraft(e.target.value)}
+            />
           </form>
           <div className="hidden text-sm text-[var(--fg-secondary)] sm:block">
-            {total} sectors
+            {totalCount} sectors
           </div>
         </div>
 
@@ -244,7 +189,6 @@ export function SectorsPageClient({
               <TH>Level</TH>
               <TH>English Name</TH>
               <TH>Chinese Name</TH>
-              <TH>Parent</TH>
               <TH>Active</TH>
               <TH>Created</TH>
               <TH className="text-right">Actions</TH>
@@ -253,73 +197,98 @@ export function SectorsPageClient({
           <tbody>
             {sectors.length === 0 ? (
               <TR className="hover:bg-transparent">
-                <TD colSpan={7} className="py-10 text-center text-[var(--fg-secondary)]">
+                <TD colSpan={6} className="py-10 text-center text-[var(--fg-secondary)]">
                   No sectors found
                 </TD>
               </TR>
             ) : (
-              sectors.map((sector) => (
-                <TR key={sector.id}>
-                  <TD>
-                    <span
-                      className={`inline-flex items-center rounded px-2 py-0.5 text-xs font-medium ${
-                        sector.level === 1
-                          ? "bg-blue-500/20 text-blue-300"
-                          : "bg-purple-500/20 text-purple-300"
-                      }`}
-                    >
-                      L{sector.level}
-                    </span>
-                  </TD>
-                  <TD className="font-medium text-[var(--fg-primary)]">
-                    {sector.name_en}
-                  </TD>
-                  <TD className="text-[var(--fg-secondary)]">{sector.name_cn ?? "-"}</TD>
-                  <TD className="text-[var(--fg-secondary)]">
-                    {sector.level === 2 ? getParentName(sector.parent_id) : "-"}
-                  </TD>
-                  <TD>
-                    <span
-                      className={`inline-flex items-center rounded px-2 py-0.5 text-xs font-medium ${
-                        sector.is_active
-                          ? "bg-green-500/20 text-green-300"
-                          : "bg-zinc-500/20 text-[var(--fg-secondary)]"
-                      }`}
-                    >
-                      {sector.is_active ? "Active" : "Inactive"}
-                    </span>
-                  </TD>
-                  <TD className="text-[var(--fg-secondary)]">
-                    {formatShanghaiYmd(sector.created_at)}
-                  </TD>
-                  <TD>
-                    <div className="flex justify-end gap-2">
-                      <ActionButton onClick={() => openEdit(sector)}>
-                        Edit
-                      </ActionButton>
-                      <ActionButton
-                        tone="danger"
-                        onClick={() => openDelete(sector)}
+              sectors.map((parent) => (
+                <React.Fragment key={parent.id}>
+                  {/* Level 1 Row */}
+                  <TR className="hover:bg-[var(--bg-surface-hover)]">
+                    <TD>
+                      <span className="inline-flex items-center rounded bg-blue-500/20 px-2 py-0.5 text-xs font-medium text-blue-300">
+                        L1
+                      </span>
+                    </TD>
+                    <TD className="font-semibold text-[var(--fg-primary)]">
+                      {parent.name_en}
+                    </TD>
+                    <TD className="text-[var(--fg-secondary)]">{parent.name_cn ?? "-"}</TD>
+                    <TD>
+                      <span
+                        className={`inline-flex items-center rounded px-2 py-0.5 text-xs font-medium ${
+                          parent.is_active
+                            ? "bg-green-500/20 text-green-300"
+                            : "bg-zinc-500/20 text-[var(--fg-secondary)]"
+                        }`}
                       >
-                        Delete
-                      </ActionButton>
-                    </div>
-                  </TD>
-                </TR>
+                        {parent.is_active ? "Active" : "Inactive"}
+                      </span>
+                    </TD>
+                    <TD className="text-[var(--fg-secondary)]">
+                      {parent.created_at ? formatShanghaiYmd(parent.created_at) : "-"}
+                    </TD>
+                    <TD>
+                      <div className="flex justify-end gap-2">
+                        <ActionButton onClick={() => openEdit(parent)}>
+                          Edit
+                        </ActionButton>
+                        <ActionButton
+                          tone="danger"
+                          onClick={() => openDelete(parent)}
+                        >
+                          Delete
+                        </ActionButton>
+                      </div>
+                    </TD>
+                  </TR>
+                  {/* Level 2 Children */}
+                  {parent.children.map((child) => (
+                    <TR key={child.id} className="hover:bg-[var(--bg-surface-hover)]">
+                      <TD>
+                        <span className="ml-4 inline-flex items-center rounded bg-purple-500/20 px-2 py-0.5 text-xs font-medium text-purple-300">
+                          L2
+                        </span>
+                      </TD>
+                      <TD className="font-medium text-[var(--fg-primary)]">
+                        <span className="ml-4">{child.name_en}</span>
+                      </TD>
+                      <TD className="text-[var(--fg-secondary)]">{child.name_cn ?? "-"}</TD>
+                      <TD>
+                        <span
+                          className={`inline-flex items-center rounded px-2 py-0.5 text-xs font-medium ${
+                            child.is_active
+                              ? "bg-green-500/20 text-green-300"
+                              : "bg-zinc-500/20 text-[var(--fg-secondary)]"
+                          }`}
+                        >
+                          {child.is_active ? "Active" : "Inactive"}
+                        </span>
+                      </TD>
+                      <TD className="text-[var(--fg-secondary)]">
+                        {formatShanghaiYmd(child.created_at)}
+                      </TD>
+                      <TD>
+                        <div className="flex justify-end gap-2">
+                          <ActionButton onClick={() => openEdit(child)}>
+                            Edit
+                          </ActionButton>
+                          <ActionButton
+                            tone="danger"
+                            onClick={() => openDelete(child)}
+                          >
+                            Delete
+                          </ActionButton>
+                        </div>
+                      </TD>
+                    </TR>
+                  ))}
+                </React.Fragment>
               ))
             )}
           </tbody>
         </Table>
-
-        <Pagination
-          page={page}
-          totalPages={totalPages}
-          onChange={(p) =>
-            router.push(
-              `/sectors${toQueryString({ q: queryDraft, page: p, level: levelFilter || undefined })}`,
-            )
-          }
-        />
       </main>
 
       <Modal
