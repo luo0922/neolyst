@@ -12,7 +12,7 @@ import { Modal } from "@/components/ui/modal";
 import { Select } from "@/components/ui/select";
 import { useToast } from "@/components/ui/toast";
 import { formatShanghaiYmd } from "@/lib/time";
-import { createBrowserClient } from "@/lib/supabase/browser";
+import { createStorageClient } from "@/lib/supabase/browser";
 import {
   activateTemplateAction,
   createTemplateAction,
@@ -120,7 +120,7 @@ export function TemplatesPageClient({
     setUploadErrors({});
 
     try {
-      const supabase = createBrowserClient();
+      const supabase = createStorageClient();
       const safeName = uploadFile.name.replace(/[^a-zA-Z0-9._-]/g, "_");
       const filePath = `templates/${uploadReportType}/${uploadFileType}/${Date.now()}_${safeName}`;
 

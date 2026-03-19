@@ -35,7 +35,7 @@ import {
 } from "@/features/reports/file-utils";
 import type { ReportDetail } from "@/features/reports/repo/reports-repo";
 import type { UserRow } from "@/domain/user";
-import { createBrowserClient } from "@/lib/supabase/browser";
+import { createStorageClient } from "@/lib/supabase/browser";
 
 type FormAnalyst = ReportAnalystInput;
 
@@ -287,7 +287,7 @@ export function NewReportPageClient({
         error: string;
       }
   > {
-    const supabase = createBrowserClient();
+    const supabase = createStorageClient();
     let wordFilePath: string | null =
       activeReport?.latest_version?.word_file_path ?? null;
     let wordFileName: string | null =
@@ -401,7 +401,7 @@ export function NewReportPageClient({
       return { ok: true };
     }
 
-    const supabase = createBrowserClient();
+    const supabase = createStorageClient();
     const allowedExtensions = [".jpg", ".jpeg", ".png", ".gif", ".webp"];
     const fileName = chiefApprovalScreenshotFile.name.toLowerCase();
     const ext = fileName.match(/\.[^.]+$/)?.[0] ?? "";

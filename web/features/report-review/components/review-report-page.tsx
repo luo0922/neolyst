@@ -20,7 +20,7 @@ import {
   getReviewReportDetailAction,
   saveReviewReportAction,
 } from "../actions";
-import { createBrowserClient } from "@/lib/supabase/browser";
+import { createStorageClient } from "@/lib/supabase/browser";
 import { buildReportStoragePath, validatePdfExtension, validateWordPptExtension } from "@/features/reports/file-utils";
 
 function formatDateTime(iso: string): string {
@@ -162,7 +162,7 @@ export function ReviewReportPage({
     pdf_file_path: string | null;
     pdf_file_name: string | null;
   }> {
-    const supabase = createBrowserClient();
+    const supabase = createStorageClient();
     let wordFilePath: string | null = detail?.latest_version?.word_file_path ?? null;
     let wordFileName: string | null = detail?.latest_version?.word_file_name ?? null;
     let pdfFilePath: string | null = detail?.latest_version?.pdf_file_path ?? null;
