@@ -347,24 +347,16 @@ export async function listReportTypeOptions(): Promise<Result<string[]>> {
   const supabase = await createServerClient();
 
   const { data, error } = await supabase
-    .from("template")
-    .select("report_type")
+    .from("report_type")
+    .select("code")
     .eq("is_active", true)
-    .neq("report_type", "");
+    .order("sort", { ascending: true });
 
   if (error) {
     return err(error.message);
   }
 
-  const distinct = Array.from(
-    new Set(
-      (data ?? [])
-        .map((item) => item.report_type?.trim())
-        .filter((value): value is string => Boolean(value)),
-    ),
-  );
-
-  return ok(distinct);
+  return ok((data ?? []).map((item) => item.code));
 }
 
 export async function reportTypeExists(reportType: string): Promise<Result<boolean>> {
