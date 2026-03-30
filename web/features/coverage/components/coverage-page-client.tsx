@@ -72,10 +72,16 @@ export function CoveragePageClient({
   const toast = useToast();
   const canEdit = userRole === "admin" || userRole === "sa";
   const canCreate = userRole === "admin" || userRole === "sa" || userRole === "analyst";
-  const activeSectorIds = React.useMemo(
-    () => new Set(sectors.map((item) => item.id)),
-    [sectors],
-  );
+  const activeSectorIds = React.useMemo(() => {
+    const ids: string[] = [];
+    for (const item of sectors) {
+      ids.push(item.id);
+      for (const child of item.children) {
+        ids.push(child.id);
+      }
+    }
+    return new Set(ids);
+  }, [sectors]);
   const activeAnalystIds = React.useMemo(
     () => new Set(analysts.map((item) => item.id)),
     [analysts],
@@ -324,10 +330,16 @@ export function CoveragePageClient({
   }
 
   function getSectorName(sectorId: string): string {
-    const sector = sectors.find((s) => s.id === sectorId);
-    return sector
-      ? `${sector.name_en}${sector.name_cn ? ` (${sector.name_cn})` : ""}`
-      : "-";
+    for (const parent of sectors) {
+      if (parent.id === sectorId) {
+        return `${parent.name_en}${parent.name_cn ? ` (${parent.name_cn})` : ""}`;
+      }
+      const child = parent.children.find((c) => c.id === sectorId);
+      if (child) {
+        return `${child.name_en}${child.name_cn ? ` (${child.name_cn})` : ""}`;
+      }
+    }
+    return "-";
   }
 
   function getAnalystNames(
