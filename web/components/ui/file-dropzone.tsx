@@ -3,7 +3,6 @@
 import * as React from "react";
 
 import { cn } from "@/lib/cn";
-import { Button } from "./button";
 
 export type FileDropzoneProps = {
   label: string;
@@ -39,12 +38,10 @@ export function FileDropzone({
       <label htmlFor={inputId} className="block text-sm font-medium text-[var(--fg-secondary)]">
         {label}
       </label>
-      <div
-        role="button"
-        tabIndex={disabled ? -1 : 0}
-        aria-disabled={disabled}
+      <label
+        htmlFor={inputId}
         className={cn(
-          "rounded-[8px] border border-dashed border-[var(--border-default)] bg-[var(--bg-surface)]/60 p-4",
+          "block rounded-[8px] border border-dashed border-[var(--border-default)] bg-[var(--bg-surface)]/60 p-4",
           "transition-all duration-200",
           !disabled && "cursor-pointer hover:border-[var(--accent)] hover:bg-[var(--bg-surface)]",
           isDragging && "border-[var(--accent)] bg-[var(--accent-soft)]",
@@ -52,9 +49,7 @@ export function FileDropzone({
           error && "border-[var(--error)]",
         )}
         onDragOver={(event) => {
-          if (disabled) {
-            return;
-          }
+          if (disabled) return;
           event.preventDefault();
           setIsDragging(true);
         }}
@@ -63,39 +58,21 @@ export function FileDropzone({
           setIsDragging(false);
         }}
         onDrop={(event) => {
-          if (disabled) {
-            return;
-          }
+          if (disabled) return;
           event.preventDefault();
           setIsDragging(false);
           handleFiles(event.dataTransfer.files);
         }}
-        onClick={() => {
-          if (disabled) {
-            return;
-          }
-          const input = document.getElementById(inputId) as HTMLInputElement | null;
-          input?.click();
-        }}
-        onKeyDown={(event) => {
-          if (disabled) {
-            return;
-          }
-          if (event.key === "Enter" || event.key === " ") {
-            event.preventDefault();
-            const input = document.getElementById(inputId) as HTMLInputElement | null;
-            input?.click();
-          }
-        }}
       >
-        <input
-          id={inputId}
-          type="file"
-          className="hidden"
-          accept={accept}
-          disabled={disabled}
-          onChange={(event) => handleFiles(event.target.files)}
-        />
+        <span className="sr-only">
+          <input
+            id={inputId}
+            type="file"
+            accept={accept}
+            disabled={disabled}
+            onChange={(event) => handleFiles(event.target.files)}
+          />
+        </span>
         <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
           <div className="min-w-0">
             <p className="text-sm text-[var(--fg-primary)]">
@@ -103,20 +80,18 @@ export function FileDropzone({
             </p>
             {hint ? <p className="text-xs text-[var(--fg-tertiary)]">{hint}</p> : null}
           </div>
-          <Button
-            type="button"
-            variant="secondary"
-            disabled={disabled}
-            onClick={(event) => {
-              event.stopPropagation();
-              const input = document.getElementById(inputId) as HTMLInputElement | null;
-              input?.click();
-            }}
+          <span
+            className={cn(
+              "inline-flex items-center justify-center gap-2 rounded-[6px] border border-[var(--border-default)] bg-[var(--bg-surface)] px-4 py-2 text-sm font-medium text-[var(--fg-primary)]",
+              "transition-all duration-200 hover:bg-[var(--bg-surface-hover)]",
+              disabled && "cursor-not-allowed opacity-60",
+            )}
+            onClick={(e) => e.stopPropagation()}
           >
             Choose File
-          </Button>
+          </span>
         </div>
-      </div>
+      </label>
       {error ? <p className="text-xs text-[var(--error)]">{error}</p> : null}
     </div>
   );

@@ -122,7 +122,9 @@ export function TemplatesPageClient({
     try {
       const supabase = createStorageClient();
       const safeName = uploadFile.name.replace(/[^a-zA-Z0-9._-]/g, "_");
-      const filePath = `templates/${uploadReportType}/${uploadFileType}/${Date.now()}_${safeName}`;
+      // Supabase storage.from('templates').upload(path) prepends bucket name automatically,
+      // so the path stored in DB should NOT include 'templates/' prefix
+      const filePath = `${uploadReportType}/${uploadFileType}/${Date.now()}_${safeName}`;
 
       const { error: uploadError } = await supabase.storage
         .from("templates")

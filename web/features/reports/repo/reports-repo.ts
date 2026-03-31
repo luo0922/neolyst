@@ -930,9 +930,12 @@ export async function getReportDownloadUrl(params: {
     return err("No permission to download this file.");
   }
 
+  // Normalize path: strip leading 'reports/' since from('reports') already includes the bucket
+  const normalizedPath = params.file_path.replace(/^reports\//, "");
+
   const { data, error } = await supabase.storage
     .from("reports")
-    .createSignedUrl(params.file_path, 60 * 5);
+    .createSignedUrl(normalizedPath, 60 * 5);
 
   if (error || !data?.signedUrl) {
     return err(error?.message ?? "Failed to create download URL.");

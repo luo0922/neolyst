@@ -93,5 +93,7 @@ export function buildReportStoragePath(params: {
   const timestamp = toUtcTimestamp(params.ts);
   const versionNo3 = String(params.versionNo).padStart(3, "0");
   const fileName = `${params.reportId}_${versionNo3}_${params.label}_${timestamp}.${extension}`;
-  return `reports/${params.reportId}/${fileName}`;
+  // Supabase storage.from('reports').upload(path) prepends bucket name automatically,
+  // so we return the relative path under the bucket (no 'reports/' prefix here)
+  return `${params.reportId}/${fileName}`;
 }
