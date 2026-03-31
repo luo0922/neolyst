@@ -12,6 +12,7 @@ import {
 } from "@/features/reports/repo/reports-repo";
 import type { ReportAnalystInput } from "@/domain/schemas/report";
 import { createServerClient } from "@/lib/supabase/server";
+import { pushReportExternal } from "./report-push-repo";
 
 export async function listReviewReports(params: {
   page: number;
@@ -66,6 +67,15 @@ export async function approveReport(params: {
     // Log error but don't fail the approval since status change succeeded
     console.error("Failed to add report to distribution queue:", queueError);
   }
+
+  // 异步触发外部推送（不阻塞审批响应）
+  pushReportExternal({
+    reportId: params.report_id,
+    triggeredBy: params.action_by,
+    triggerType: "auto",
+  }).catch((err) => {
+    console.error("External push failed:", err);
+  });
 
   return statusResult;
 }

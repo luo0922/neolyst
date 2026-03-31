@@ -410,7 +410,7 @@ export function NewReportPageClient({
       return { ok: false, error: "Chief approval screenshot must be an image (jpg, png, gif, webp)" };
     }
 
-    const path = `approvals/${params.reportId}/${Date.now()}${ext}`;
+    const path = `reports/${params.reportId}/chief-approval/${Date.now()}${ext}`;
 
     const { error } = await supabase.storage
       .from("reports")
