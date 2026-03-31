@@ -84,7 +84,11 @@ function resolveOptionalId(
   if (input === undefined) {
     return fallback ?? null;
   }
-  return input ?? null;
+  // Treat empty string as null to avoid "Invalid UUID" in RPC calls
+  if (input === "" || input === null) {
+    return null;
+  }
+  return input;
 }
 
 function resolveOptionalBoolean(
