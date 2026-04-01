@@ -13,15 +13,17 @@ import { RichTextEditor } from "@/components/ui/rich-text-editor";
 import { useToast } from "@/components/ui/toast";
 import type { ReportDetail } from "@/features/reports/repo/reports-repo";
 import type { Analyst } from "@/features/analyst-info/repo/analysts-repo";
-import { getReportDownloadUrlAction } from "@/features/reports/actions";
+import {
+  getReportDownloadUrlAction,
+  uploadReportFileAction,
+} from "@/features/reports/actions";
 
 import {
   executeReviewAction,
   getReviewReportDetailAction,
   saveReviewReportAction,
 } from "../actions";
-import { createStorageClient } from "@/lib/supabase/browser";
-import { buildReportStoragePath, validatePdfExtension, validateWordPptExtension } from "@/features/reports/file-utils";
+import { validatePdfExtension, validateWordPptExtension } from "@/features/reports/file-utils";
 
 function formatDateTime(iso: string): string {
   const d = new Date(iso);
@@ -162,7 +164,6 @@ export function ReviewReportPage({
     pdf_file_path: string | null;
     pdf_file_name: string | null;
   }> {
-    const supabase = createStorageClient();
     let wordFilePath: string | null = detail?.latest_version?.word_file_path ?? null;
     let wordFileName: string | null = detail?.latest_version?.word_file_name ?? null;
     let pdfFilePath: string | null = detail?.latest_version?.pdf_file_path ?? null;
@@ -176,24 +177,18 @@ export function ReviewReportPage({
         return { word_file_path: null, word_file_name: null, pdf_file_path: null, pdf_file_name: null };
       }
 
-      const path = buildReportStoragePath({
-        reportId: params.reportId,
-        versionNo: params.versionNo,
-        label: "report",
-        extension: check.extension,
-      });
+      const fd = new FormData();
+      fd.append("file", reportFile);
+      fd.append("reportId", params.reportId);
+      fd.append("versionNo", String(params.versionNo));
+      fd.append("label", "report");
 
-      const { error } = await supabase.storage
-        .from("reports")
-        .upload(path, reportFile, {
-          upsert: true,
-        });
-
-      if (error) {
-        toast.error(error.message, { title: "Upload Error" });
+      const result = await uploadReportFileAction(fd);
+      if (!result.ok) {
+        toast.error(result.error, { title: "Upload Error" });
         return { word_file_path: null, word_file_name: null, pdf_file_path: null, pdf_file_name: null };
       }
-      wordFilePath = path;
+      wordFilePath = result.file_path;
       wordFileName = reportFile.name;
     }
 
@@ -205,24 +200,18 @@ export function ReviewReportPage({
         return { word_file_path: null, word_file_name: null, pdf_file_path: null, pdf_file_name: null };
       }
 
-      const path = buildReportStoragePath({
-        reportId: params.reportId,
-        versionNo: params.versionNo,
-        label: "report-pdf",
-        extension: check.extension,
-      });
+      const fd = new FormData();
+      fd.append("file", pdfFile);
+      fd.append("reportId", params.reportId);
+      fd.append("versionNo", String(params.versionNo));
+      fd.append("label", "report-pdf");
 
-      const { error } = await supabase.storage
-        .from("reports")
-        .upload(path, pdfFile, {
-          upsert: true,
-        });
-
-      if (error) {
-        toast.error(error.message, { title: "Upload Error" });
+      const result = await uploadReportFileAction(fd);
+      if (!result.ok) {
+        toast.error(result.error, { title: "Upload Error" });
         return { word_file_path: null, word_file_name: null, pdf_file_path: null, pdf_file_name: null };
       }
-      pdfFilePath = path;
+      pdfFilePath = result.file_path;
       pdfFileName = pdfFile.name;
     }
 

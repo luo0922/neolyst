@@ -12,11 +12,11 @@ import { Modal } from "@/components/ui/modal";
 import { Select } from "@/components/ui/select";
 import { useToast } from "@/components/ui/toast";
 import { formatShanghaiYmd } from "@/lib/time";
-import { createStorageClient } from "@/lib/supabase/browser";
 import {
   activateTemplateAction,
   createTemplateAction,
   deleteTemplateAction,
+  uploadTemplateFileAction,
 } from "../actions";
 import type {
   TemplateGroup,
@@ -120,18 +120,14 @@ export function TemplatesPageClient({
     setUploadErrors({});
 
     try {
-      const supabase = createStorageClient();
-      const safeName = uploadFile.name.replace(/[^a-zA-Z0-9._-]/g, "_");
-      // Supabase storage.from('templates').upload(path) prepends bucket name automatically,
-      // so the path stored in DB should NOT include 'templates/' prefix
-      const filePath = `${uploadReportType}/${uploadFileType}/${Date.now()}_${safeName}`;
+      const fd = new FormData();
+      fd.append("file", uploadFile);
+      fd.append("reportType", uploadReportType);
+      fd.append("fileType", uploadFileType);
 
-      const { error: uploadError } = await supabase.storage
-        .from("templates")
-        .upload(filePath, uploadFile, { upsert: false });
-
-      if (uploadError) {
-        toast.error(uploadError.message, { title: "Error" });
+      const uploadResult = await uploadTemplateFileAction(fd);
+      if (!uploadResult.ok) {
+        toast.error(uploadResult.error, { title: "Error" });
         setUploadLoading(false);
         return;
       }
@@ -141,7 +137,7 @@ export function TemplatesPageClient({
         report_type: uploadReportType,
         file_type: uploadFileType,
         language: uploadLanguage,
-        file_path: filePath,
+        file_path: uploadResult.file_path,
       });
 
       if (!res.ok) {

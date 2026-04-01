@@ -20,18 +20,3 @@ export function createBrowserClient(): SupabaseClient {
     process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
   );
 }
-
-/**
- * 创建带有自定义 Storage URL 的 Supabase 客户端
- * 用于上传附件时使用公网地址
- */
-export function createStorageClient(): SupabaseClient {
-  const storageUrl = process.env.NEXT_PUBLIC_SUPABASE_STORAGE_URL;
-  if (!storageUrl) {
-    return createBrowserClient();
-  }
-  return createClient(
-    storageUrl,
-    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
-  );
-}

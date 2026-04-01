@@ -34,14 +34,13 @@ import {
   saveChiefApproveAction,
   saveReportContentAction,
   submitReportAction,
+  uploadReportFileAction,
 } from "@/features/reports/actions";
 import {
-  buildReportStoragePath,
   validateUploadExtension,
   validateWordPptExtension,
   validatePdfExtension,
 } from "@/features/reports/file-utils";
-import { createStorageClient } from "@/lib/supabase/browser";
 
 type FormAnalyst = ReportAnalystInput;
 
@@ -306,7 +305,6 @@ export function EditReportPageClient({
         error: string;
       }
   > {
-    const supabase = createStorageClient();
     let wordFilePath: string | null =
       activeReport?.latest_version?.word_file_path ?? null;
     let wordFileName: string | null =
@@ -327,23 +325,17 @@ export function EditReportPageClient({
         return { ok: false, error: check.error };
       }
 
-      const path = buildReportStoragePath({
-        reportId: params.reportId,
-        versionNo: params.versionNo,
-        label: "report",
-        extension: check.extension,
-      });
+      const fd = new FormData();
+      fd.append("file", reportFile);
+      fd.append("reportId", params.reportId);
+      fd.append("versionNo", String(params.versionNo));
+      fd.append("label", "report");
 
-      const { error } = await supabase.storage
-        .from("reports")
-        .upload(path, reportFile, {
-          upsert: true,
-        });
-
-      if (error) {
-        return { ok: false, error: error.message };
+      const result = await uploadReportFileAction(fd);
+      if (!result.ok) {
+        return { ok: false, error: result.error };
       }
-      wordFilePath = path;
+      wordFilePath = result.file_path;
       wordFileName = reportFile.name;
     }
 
@@ -354,49 +346,38 @@ export function EditReportPageClient({
         return { ok: false, error: check.error };
       }
 
-      const path = buildReportStoragePath({
-        reportId: params.reportId,
-        versionNo: params.versionNo,
-        label: "report-pdf",
-        extension: check.extension,
-      });
+      const fd = new FormData();
+      fd.append("file", pdfFile);
+      fd.append("reportId", params.reportId);
+      fd.append("versionNo", String(params.versionNo));
+      fd.append("label", "report-pdf");
 
-      const { error } = await supabase.storage
-        .from("reports")
-        .upload(path, pdfFile, {
-          upsert: true,
-        });
-
-      if (error) {
-        return { ok: false, error: error.message };
+      const result = await uploadReportFileAction(fd);
+      if (!result.ok) {
+        return { ok: false, error: result.error };
       }
-      pdfFilePath = path;
+      pdfFilePath = result.file_path;
       pdfFileName = pdfFile.name;
     }
 
+    // Upload Model file
     if (modelFile) {
       const check = validateUploadExtension("model", modelFile.name);
       if (!check.ok) {
         return { ok: false, error: check.error };
       }
 
-      const path = buildReportStoragePath({
-        reportId: params.reportId,
-        versionNo: params.versionNo,
-        label: "model",
-        extension: check.extension,
-      });
+      const fd = new FormData();
+      fd.append("file", modelFile);
+      fd.append("reportId", params.reportId);
+      fd.append("versionNo", String(params.versionNo));
+      fd.append("label", "model");
 
-      const { error } = await supabase.storage
-        .from("reports")
-        .upload(path, modelFile, {
-          upsert: true,
-        });
-
-      if (error) {
-        return { ok: false, error: error.message };
+      const result = await uploadReportFileAction(fd);
+      if (!result.ok) {
+        return { ok: false, error: result.error };
       }
-      modelFilePath = path;
+      modelFilePath = result.file_path;
       modelFileName = modelFile.name;
     }
 
@@ -420,7 +401,6 @@ export function EditReportPageClient({
       return { ok: true };
     }
 
-    const supabase = createStorageClient();
     const allowedExtensions = [".jpg", ".jpeg", ".png", ".gif", ".webp"];
     const fileName = chiefApprovalScreenshotFile.name.toLowerCase();
     const ext = fileName.match(/\.[^.]+$/)?.[0] ?? "";
@@ -429,22 +409,20 @@ export function EditReportPageClient({
       return { ok: false, error: "Chief approval screenshot must be an image (jpg, png, gif, webp)" };
     }
 
-    const path = `${params.reportId}/chief-approval/${Date.now()}${ext}`;
+    const fd = new FormData();
+    fd.append("file", chiefApprovalScreenshotFile);
+    fd.append("reportId", params.reportId);
+    fd.append("label", "chief-approval");
 
-    const { error } = await supabase.storage
-      .from("reports")
-      .upload(path, chiefApprovalScreenshotFile, {
-        upsert: true,
-      });
-
-    if (error) {
-      return { ok: false, error: error.message };
+    const result = await uploadReportFileAction(fd);
+    if (!result.ok) {
+      return { ok: false, error: result.error };
     }
 
     // Save to chief_approve table
     const saveResult = await saveChiefApproveAction({
       report_id: params.reportId,
-      file_path: path,
+      file_path: result.file_path,
       file_name: chiefApprovalScreenshotFile.name,
       file_type: chiefApprovalScreenshotFile.type,
     });

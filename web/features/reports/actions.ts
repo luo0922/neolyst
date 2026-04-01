@@ -14,7 +14,7 @@ import {
 } from "@/domain/schemas/report";
 import { listAllActiveAnalysts } from "@/features/analyst-info/repo/analysts-repo";
 import { err, type Result } from "@/lib/result";
-import { requireAuth } from "@/lib/supabase/server";
+import { createServiceRoleClient, requireAuth } from "@/lib/supabase/server";
 
 import {
   changeReportStatus,
@@ -812,4 +812,59 @@ export async function saveChiefApproveAction(input: {
     file_name: input.file_name,
     file_type: input.file_type,
   });
+}
+
+export type StorageUploadResult =
+  | { ok: true; file_path: string }
+  | { ok: false; error: string };
+
+export async function uploadReportFileAction(
+  formData: FormData,
+): Promise<StorageUploadResult> {
+  const actor = await getActor();
+  if (!actor.ok) {
+    return { ok: false, error: "Unauthorized" };
+  }
+  if (!canCreateOrEdit(actor.data.role)) {
+    return { ok: false, error: "No permission" };
+  }
+
+  const file = formData.get("file") as File | null;
+  const reportId = formData.get("reportId") as string | null;
+  const label = formData.get("label") as string;
+  const bucket = (formData.get("bucket") as string | null) ?? "reports";
+
+  if (!file || !reportId || !label) {
+    return { ok: false, error: "Missing required fields." };
+  }
+
+  const safeName = file.name.replace(/[^a-zA-Z0-9._-]/g, "_");
+  const timestamp = new Date().toISOString().replace(/[:.]/g, "-");
+
+  let filePath: string;
+  if (label === "chief-approval") {
+    // Chief approval: ${reportId}/chief-approval/${timestamp}_${safeName}
+    filePath = `${reportId}/chief-approval/${timestamp}_${safeName}`;
+  } else {
+    // Regular report file: ${reportId}/${reportId}_${versionNo3}_${label}_${timestamp}_${safeName}
+    const versionNo = parseInt(formData.get("versionNo") as string, 10);
+    const versionNo3 = String(isNaN(versionNo) ? 1 : versionNo).padStart(3, "0");
+    filePath = `${reportId}/${reportId}_${versionNo3}_${label}_${timestamp}_${safeName}`;
+  }
+
+  const supabase = createServiceRoleClient();
+  const arrayBuffer = await file.arrayBuffer();
+
+  const { error } = await supabase.storage
+    .from(bucket)
+    .upload(filePath, arrayBuffer, {
+      contentType: file.type,
+      upsert: true,
+    });
+
+  if (error) {
+    return { ok: false, error: error.message };
+  }
+
+  return { ok: true, file_path: filePath };
 }

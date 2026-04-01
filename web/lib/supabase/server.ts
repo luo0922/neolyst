@@ -15,6 +15,7 @@
  */
 
 import { createServerClient as createClient } from "@supabase/ssr";
+import { createClient as createSvcClient } from "@supabase/supabase-js";
 import { cookies } from "next/headers";
 
 export async function createServerClient() {
@@ -101,4 +102,15 @@ export async function requireAdminOrAnalyst() {
     throw new Error("No permission");
   }
   return user;
+}
+
+/**
+ * 用 SERVICE_ROLE_KEY 创建 Supabase 客户端（绕过 RLS）
+ * 仅限 Server Actions / Route Handlers 使用，切勿暴露到客户端
+ */
+export function createServiceRoleClient() {
+  return createSvcClient(
+    process.env.NEXT_PUBLIC_SUPABASE_URL!,
+    process.env.SUPABASE_SERVICE_ROLE_KEY!
+  );
 }

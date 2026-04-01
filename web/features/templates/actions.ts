@@ -7,7 +7,11 @@ import {
   templateUpdateSchema,
 } from "@/domain/schemas/template";
 import { err, ok, type Result } from "@/lib/result";
-import { requireAdmin, getCurrentUser } from "@/lib/supabase/server";
+import { requireAdmin, getCurrentUser, createServiceRoleClient } from "@/lib/supabase/server";
+
+type StorageUploadResult =
+  | { ok: true; file_path: string }
+  | { ok: false; error: string };
 
 import {
   activateTemplate as activateTemplateRepo,
@@ -192,4 +196,38 @@ export async function deleteTemplateAction(id: string): Promise<Result<null>> {
   }
   revalidatePath("/templates");
   return ok(null);
+}
+
+export async function uploadTemplateFileAction(
+  formData: FormData,
+): Promise<StorageUploadResult> {
+  await requireAdminOrThrow();
+
+  const file = formData.get("file") as File | null;
+  const reportType = formData.get("reportType") as string | null;
+  const fileType = formData.get("fileType") as string | null;
+
+  if (!file || !reportType || !fileType) {
+    return { ok: false, error: "Missing required fields." };
+  }
+
+  const safeName = file.name.replace(/[^a-zA-Z0-9._-]/g, "_");
+  const timestamp = new Date().toISOString().replace(/[:.]/g, "-");
+  const filePath = `${reportType}/${fileType}/${timestamp}_${safeName}`;
+
+  const supabase = createServiceRoleClient();
+  const arrayBuffer = await file.arrayBuffer();
+
+  const { error } = await supabase.storage
+    .from("templates")
+    .upload(filePath, arrayBuffer, {
+      contentType: file.type,
+      upsert: false,
+    });
+
+  if (error) {
+    return { ok: false, error: error.message };
+  }
+
+  return { ok: true, file_path: filePath };
 }
