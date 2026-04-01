@@ -132,7 +132,7 @@ export async function pushReportExternal(
     if (analysts) {
       analystField = analysts
         .map((a) => {
-          const name = a.chinese_name ?? a.full_name ?? "";
+          const name = a.full_name ?? a.chinese_name ?? "";
           return name ? `${name}<${a.email}>` : `<${a.email}>`;
         })
         .join(",");
