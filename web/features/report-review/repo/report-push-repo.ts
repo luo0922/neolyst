@@ -66,7 +66,8 @@ export async function pushReportExternal(
       investment_thesis,
       contact_person_id,
       sector_id,
-      current_version_no
+      current_version_no,
+      coverage_id
     `,
     )
     .eq("id", reportId)
@@ -144,10 +145,10 @@ export async function pushReportExternal(
   if (report.region_code) {
     const { data: region } = await adminClient
       .from("region")
-      .select("name")
+      .select("name_en")
       .eq("code", report.region_code)
       .single();
-    regionName = region?.name ?? null;
+    regionName = region?.name_en ?? null;
   }
 
   // 7. 获取行业分类名称
@@ -155,13 +156,24 @@ export async function pushReportExternal(
   if (report.sector_id) {
     const { data: sector } = await adminClient
       .from("sector")
-      .select("name")
+      .select("name_cn")
       .eq("id", report.sector_id)
       .single();
-    sectorName = sector?.name ?? null;
+    sectorName = sector?.name_cn ?? null;
   }
 
-  // 8. 获取联系人信息
+  // 8. 获取 coverage 的 english_full_name 作为 ticker_name
+  let tickerName: string | null = null;
+  if (report.coverage_id) {
+    const { data: coverage } = await adminClient
+      .from("coverage")
+      .select("english_full_name")
+      .eq("id", report.coverage_id)
+      .single();
+    tickerName = coverage?.english_full_name ?? null;
+  }
+
+  // 9. 获取联系人信息
   let contactPersonField: string | null = null;
   if (report.contact_person_id) {
     const { data: contactUser } = await adminClient
@@ -180,7 +192,7 @@ export async function pushReportExternal(
     }
   }
 
-  // 9. 下载 PDF 文件
+  // 10. 下载 PDF 文件
   let pdfBlob: Blob | null = null;
   if (pdfFilePath) {
     const { data: pdfData, error: pdfError } = await adminClient.storage
@@ -197,7 +209,7 @@ export async function pushReportExternal(
     }
   }
 
-  // 10. 构造 FormData
+  // 11. 构造 FormData
   const formData = new FormData();
 
   // 必填字段
@@ -227,6 +239,7 @@ export async function pushReportExternal(
     formData.append("investment_thesis", report.investment_thesis);
   }
   if (analystField) formData.append("analyst", analystField);
+  if (tickerName) formData.append("ticker_name", tickerName);
   if (contactPersonField) {
     formData.append("contact_person", contactPersonField);
   }
@@ -236,7 +249,7 @@ export async function pushReportExternal(
     formData.append("attachment_pdf", pdfBlob, pdfFileName);
   }
 
-  // 11. 调用外部接口
+  // 12. 调用外部接口
   let httpStatusCode: number | null = null;
   let responseBody = "";
   let errorMessage: string | null = null;
@@ -271,7 +284,7 @@ export async function pushReportExternal(
     }
   }
 
-  // 12. 记录推送日志
+  // 13. 记录推送日志
   await logPush({
     reportId,
     status: pushStatus,
@@ -291,6 +304,7 @@ export async function pushReportExternal(
       has_report_language: !!report.report_language,
       has_investment_thesis: !!report.investment_thesis,
       has_analyst: !!analystField,
+      has_ticker_name: !!tickerName,
       has_contact_person: !!contactPersonField,
       attachment_pdf: pdfFileName ?? null,
       attachment_size: pdfBlob?.size ?? null,
