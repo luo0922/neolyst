@@ -421,7 +421,6 @@ export function ReviewReportPage({
               label="Investment Thesis"
               value={formInvestmentThesis}
               onChange={setFormInvestmentThesis}
-              placeholder="Report abstract..."
               minHeight="150px"
             />
           </div>

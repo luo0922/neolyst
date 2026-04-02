@@ -1,38 +1,128 @@
-.RichTextEditor .ProseMirror {
-  font-family: '楷体GB_2312', 'KaiTi', '楷体', 'STKaiti', Calibri, Cambria, 'Times New Roman', serif;
+/* TinyMCE dark theme overrides — matches Tailwind zinc palette */
+
+:root {
+  --editor-bg: #18181b;
+  --toolbar-bg: rgba(39, 39, 42, 0.5);
+  --border-color: rgba(255, 255, 255, 0.1);
+  --text-color: #f4f4f5;
+  --text-muted: #a1a1aa;
+  --text-secondary: #d4d4d8;
+  --hover-bg: #3f3f46;
+  --active-bg: rgba(37, 99, 235, 0.8);
+  --focus-ring: rgba(37, 99, 235, 0.4);
 }
 
-.RichTextEditor .ProseMirror p,
-.RichTextEditor .ProseMirror li {
-  font-family: inherit;
-  text-align: justify;
+/* Top-level editor container */
+.tox-tinymce {
+  border-radius: 8px !important;
+  border: 1px solid var(--border-color) !important;
+  font-family: inherit !important;
+  overflow: hidden;
 }
 
-.RichTextEditor .ProseMirror h1,
-.RichTextEditor .ProseMirror h2,
-.RichTextEditor .ProseMirror h3 {
-  font-family: inherit;
+/* Toolbar */
+.tox-toolbar__primary {
+  background: var(--toolbar-bg) !important;
+  border-bottom: 1px solid var(--border-color) !important;
 }
 
-.RichTextEditor .ProseMirror strong,
-.RichTextEditor .ProseMirror b {
-  font-family: inherit;
+/* Button icons */
+.tox-tbtn svg {
+  fill: var(--text-muted) !important;
+}
+.tox-tbtn:hover {
+  background-color: var(--hover-bg) !important;
+}
+.tox-tbtn:hover svg {
+  fill: var(--text-color) !important;
 }
 
-.RichTextEditor .ProseMirror em,
-.RichTextEditor .ProseMirror i {
-  font-family: inherit;
+/* Active / pressed button */
+.tox-tbtn[aria-pressed="true"],
+.tox-tbtn.tox-tbtn--enabled {
+  background-color: var(--active-bg) !important;
+}
+.tox-tbtn[aria-pressed="true"] svg,
+.tox-tbtn.tox-tbtn--enabled svg {
+  fill: #ffffff !important;
 }
 
-.RichTextEditor .ProseMirror ul,
-.RichTextEditor .ProseMirror ol {
-  font-family: inherit;
+/* Dropdown menus */
+.tox-menu {
+  background-color: #27272a !important;
+  border: 1px solid var(--border-color) !important;
+  border-radius: 6px !important;
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.4) !important;
 }
 
-.RichTextEditor .ProseMirror code {
-  font-family: 'Consolas', 'Monaco', monospace;
+.tox-collection__item {
+  color: var(--text-secondary) !important;
 }
 
-.RichTextEditor .ProseMirror:focus {
-  outline: none;
+.tox-collection__item:hover {
+  background-color: var(--hover-bg) !important;
+  color: var(--text-color) !important;
+}
+
+.tox-collection__item--active {
+  background-color: var(--active-bg) !important;
+  color: #ffffff !important;
+}
+
+/* Format list in toolbar dropdown */
+.tox-pop {
+  background-color: #27272a !important;
+  border: 1px solid var(--border-color) !important;
+  border-radius: 6px !important;
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.4) !important;
+}
+
+/* Tooltip */
+.tox-tooltip {
+  background-color: var(--hover-bg) !important;
+  color: var(--text-color) !important;
+  border-radius: 4px !important;
+}
+
+/* Statusbar */
+.tox-statusbar {
+  background-color: var(--toolbar-bg) !important;
+  border-top: 1px solid var(--border-color) !important;
+  color: var(--text-muted) !important;
+}
+
+/* Focus ring on outer container */
+.tox-tinymce:focus-within {
+  box-shadow: 0 0 0 2px var(--focus-ring) !important;
+  border-color: rgba(37, 99, 235, 0.5) !important;
+}
+
+/* Editor content text color */
+.tox .tox-edit-area__iframe {
+  background-color: #18181b !important;
+}
+
+.tox.tox-tinymce .tox-edit-area__iframe html,
+.tox.tox-tinymce .tox-edit-area__iframe body,
+.tox-tinymce .mce-content-body {
+  color: #000000 !important;
+  background-color: #18181b !important;
+  font-family: Calibri, '楷体GB2312', 'KaiTi', '楷体', sans-serif !important;
+  font-size: 16px !important;
+  min-height: 500px;
+}
+
+/* Scrollbar */
+.tox ::-webkit-scrollbar {
+  width: 6px;
+}
+.tox ::-webkit-scrollbar-track {
+  background: var(--editor-bg);
+}
+.tox ::-webkit-scrollbar-thumb {
+  background: var(--hover-bg);
+  border-radius: 3px;
+}
+.tox ::-webkit-scrollbar-thumb:hover {
+  background: #52525b;
 }

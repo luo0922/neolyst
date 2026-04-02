@@ -866,7 +866,6 @@ export function EditReportPageClient({
             label="Investment Thesis"
             value={formInvestmentThesis}
             onChange={setFormInvestmentThesis}
-            placeholder="Report abstract..."
             minHeight="150px"
           />
         </section>
