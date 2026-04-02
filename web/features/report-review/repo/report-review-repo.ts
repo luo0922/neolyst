@@ -11,7 +11,6 @@ import {
   type ReportSummary,
 } from "@/features/reports/repo/reports-repo";
 import type { ReportAnalystInput } from "@/domain/schemas/report";
-import { createServerClient } from "@/lib/supabase/server";
 import { pushReportExternal } from "./report-push-repo";
 
 export async function listReviewReports(params: {
@@ -51,21 +50,6 @@ export async function approveReport(params: {
 
   if (!statusResult.ok) {
     return statusResult;
-  }
-
-  // Add to report distribution queue after successful approval
-  const supabase = await createServerClient();
-  const { error: queueError } = await supabase
-    .from("report_distribution_queue")
-    .insert({
-      report_id: params.report_id,
-      status: "pending",
-      scheduled_at: new Date().toISOString(),
-    });
-
-  if (queueError) {
-    // Log error but don't fail the approval since status change succeeded
-    console.error("Failed to add report to distribution queue:", queueError);
   }
 
   // 异步触发外部推送（不阻塞审批响应）
