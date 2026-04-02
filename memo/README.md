@@ -17,4 +17,8 @@
 | 文件 | 说明 |
 |------|------|
 | [MEMO-hook-modification.md](./MEMO-hook-modification.md) | Everything Claude Code 插件的本地 Hook 修改记录 |
+| [MEMO-nextjs-best-practice-1.md](./MEMO-nextjs-best-practice-1.md) | Next.js 最佳实践补充 |
+| [MEMO-nextjs-best-practice.md](./MEMO-nextjs-best-practice.md) | Next.js 最佳实践 |
+| [MEMO-nextjs-supabase-best-practice.md](./MEMO-nextjs-supabase-best-practice.md) | Next.js + Supabase 集成最佳实践 |
+| [MEMO-report-change-gap-analysis.md](./MEMO-report-change-gap-analysis.md) | 报告变更功能差距分析 |
 | [MEMO-supabase-troubleshooting.md](./MEMO-supabase-troubleshooting.md) | Supabase 问题排查（Auth 500、gotrue 失败、CLI 常见问题等） |

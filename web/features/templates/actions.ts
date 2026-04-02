@@ -8,6 +8,7 @@ import {
 } from "@/domain/schemas/template";
 import { err, ok, type Result } from "@/lib/result";
 import { requireAdmin, getCurrentUser, createServiceRoleClient } from "@/lib/supabase/server";
+import { updateTemplate } from "./repo/templates-repo";
 
 type StorageUploadResult =
   | { ok: true; file_path: string }
@@ -169,13 +170,6 @@ export async function updateTemplateAction(
     return err(parsed.error.issues[0]?.message ?? "Invalid input.");
   }
 
-  // Note: Only name can be updated via this action
-  const result = await createTemplateRepo({
-    name: parsed.data.name || "",
-  } as Parameters<typeof createTemplateRepo>[0]);
-
-  // Use direct repo call for simple name update
-  const { updateTemplate } = await import("./repo/templates-repo");
   const updateResult = await updateTemplate(id, { name: parsed.data.name });
 
   if (updateResult.ok) {

@@ -99,9 +99,10 @@ export async function inviteUserAction(
 function generateTempPassword(): string {
   const chars =
     "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789!@#$%";
+  const randomValues = crypto.getRandomValues(new Uint32Array(16));
   let password = "";
   for (let i = 0; i < 16; i++) {
-    password += chars.charAt(Math.floor(Math.random() * chars.length));
+    password += chars.charAt(randomValues[i] % chars.length);
   }
   return password;
 }
