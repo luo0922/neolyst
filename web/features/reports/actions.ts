@@ -216,7 +216,7 @@ async function validateReportForSubmit(
     return "Failed to validate template availability.";
   }
   if (!templateCheck.data) {
-    return "No valid active template found for selected Report Type.";
+    return "No valid template found for selected Report Type.";
   }
 
   if (!trimToNull(detail.title)) {

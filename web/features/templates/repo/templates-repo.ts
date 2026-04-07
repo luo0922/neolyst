@@ -7,11 +7,11 @@ export type Template = {
   id: string;
   name: string;
   report_type: string;
-  file_type: "report" | "model";
   language: "en" | "zh";
-  file_path: string;
+  template_file_path: string;
+  schema_file_path: string | null;
   version: number;
-  is_active: boolean;
+  sort: number;
   uploaded_by: string | null;
   created_at: string;
   updated_at: string;
@@ -20,7 +20,6 @@ export type Template = {
 export type TemplateGroup = {
   report_type: string;
   language: "en" | "zh";
-  // All templates in this group (different file_types)
   templates: Template[];
 };
 
@@ -33,11 +32,10 @@ export type ReportType =
   | "strategy"
   | "quantitative"
   | "bond";
-export type FileType = "report" | "model";
 export type Language = "en" | "zh";
 
-function hasTemplateFile(template: Pick<Template, "file_path">): boolean {
-  return template.file_path.trim().length > 0;
+function hasTemplateFile(template: Pick<Template, "template_file_path">): boolean {
+  return template.template_file_path.trim().length > 0;
 }
 
 /**
@@ -46,23 +44,24 @@ function hasTemplateFile(template: Pick<Template, "file_path">): boolean {
 export async function listTemplatesGrouped(): Promise<Result<TemplateGroup[]>> {
   const supabase = await createServerClient();
 
+  // 查询所有模板，按 sort 排序，同 sort 内按 version 倒序
   const { data, error } = await supabase
     .from("template")
     .select("*")
-    .order("created_at", { ascending: false });
+    .order("sort", { ascending: true })
+    .order("version", { ascending: false });
 
   if (error) return err(error.message);
   if (!data) return err("Failed to fetch templates");
 
-  // Group templates by (report_type, language)
+  // Group by (report_type, language)，每个 group 只取第一条（version 最高）
   const groups = new Map<string, Template[]>();
 
-  for (const template of data) {
-    const key = `${template.report_type}:${template.language}`;
+  for (const row of data as Template[]) {
+    const key = `${row.report_type}:${row.language}`;
     if (!groups.has(key)) {
-      groups.set(key, []);
+      groups.set(key, [row]);
     }
-    groups.get(key)!.push(template as Template);
   }
 
   // Convert to TemplateGroup format
@@ -78,11 +77,11 @@ export async function listTemplatesGrouped(): Promise<Result<TemplateGroup[]>> {
     });
   }
 
-  // Sort by report_type, then language
+  // Sort by sort field, then language
   result.sort((a, b) => {
-    if (a.report_type !== b.report_type) {
-      return a.report_type.localeCompare(b.report_type);
-    }
+    const sortA = a.templates[0]?.sort ?? 0;
+    const sortB = b.templates[0]?.sort ?? 0;
+    if (sortA !== sortB) return sortA - sortB;
     return a.language.localeCompare(b.language);
   });
 
@@ -94,8 +93,6 @@ export async function listTemplatesGrouped(): Promise<Result<TemplateGroup[]>> {
  */
 export async function listTemplates(params?: {
   report_type?: ReportType;
-  file_type?: FileType;
-  is_active?: boolean;
 }): Promise<Result<Template[]>> {
   const supabase = await createServerClient();
 
@@ -106,14 +103,6 @@ export async function listTemplates(params?: {
 
   if (params?.report_type) {
     query = query.eq("report_type", params.report_type);
-  }
-
-  if (params?.file_type) {
-    query = query.eq("file_type", params.file_type);
-  }
-
-  if (params?.is_active !== undefined) {
-    query = query.eq("is_active", params.is_active);
   }
 
   const { data, error } = await query;
@@ -138,37 +127,6 @@ export async function getTemplate(id: string): Promise<Result<Template>> {
 
   if (error) return err(error.message);
   if (!data) return err("Template not found");
-
-  return ok(data as Template);
-}
-
-/**
- * Get the active template for a report_type and file_type
- */
-export async function getActiveTemplate(
-  report_type: ReportType,
-  file_type: FileType
-): Promise<Result<Template>> {
-  const supabase = await createServerClient();
-
-  const { data, error } = await supabase
-    .from("template")
-    .select("*")
-    .eq("report_type", report_type)
-    .eq("file_type", file_type)
-    .eq("is_active", true)
-    .single();
-
-  if (error) {
-    if (error.code === "PGRST116") {
-      return err("No active template found for this report type and file type");
-    }
-    return err(error.message);
-  }
-
-  if (!data || !hasTemplateFile(data as Template)) {
-    return err("No active template found for this report type and file type");
-  }
 
   return ok(data as Template);
 }
@@ -198,9 +156,8 @@ export async function hasValidTemplateForReportType(
 
   let query = supabase
     .from("template")
-    .select("id, file_path, is_active")
-    .eq("report_type", reportType)
-    .eq("is_active", true);
+    .select("id, template_file_path")
+    .eq("report_type", reportType);
 
   if (language) {
     query = query.eq("language", language);
@@ -212,17 +169,42 @@ export async function hasValidTemplateForReportType(
   if (!data || data.length === 0) return ok(false);
 
   return ok(
-    data.some((item) => Boolean(item.file_path && item.file_path.trim().length > 0)),
+    data.some((item) => Boolean(item.template_file_path && item.template_file_path.trim().length > 0)),
   );
 }
 
 /**
- * Get the next version number for a report_type, file_type, and language
+ * Get the latest template for a report_type and language (no activation needed)
+ */
+export async function getLatestTemplate(
+  report_type: ReportType,
+  language: "en" | "zh",
+): Promise<Result<Template | null>> {
+  const supabase = await createServerClient();
+
+  const { data, error } = await supabase
+    .from("template")
+    .select("*")
+    .eq("report_type", report_type)
+    .eq("language", language)
+    .order("version", { ascending: false })
+    .limit(1)
+    .maybeSingle();
+
+  if (error) return err(error.message);
+
+  if (!data) return ok(null);
+  if (!hasTemplateFile(data as Template)) return ok(null);
+
+  return ok(data as Template);
+}
+
+/**
+ * Get the next version number for a report_type and language
  */
 export async function getNextVersion(
   report_type: ReportType,
-  file_type: FileType,
-  language: "en" | "zh" = "en"
+  language: "en" | "zh" = "en",
 ): Promise<number> {
   const supabase = await createServerClient();
 
@@ -230,7 +212,6 @@ export async function getNextVersion(
     .from("template")
     .select("version")
     .eq("report_type", report_type)
-    .eq("file_type", file_type)
     .eq("language", language)
     .order("version", { ascending: false })
     .limit(1)
@@ -240,103 +221,40 @@ export async function getNextVersion(
 }
 
 /**
- * Create a new template version
+ * Create a new template
  */
 export async function createTemplate(params: {
   name: string;
   report_type: ReportType;
-  file_type: FileType;
   language?: "en" | "zh";
-  file_path: string;
+  template_file_path: string;
+  schema_file_path?: string | null;
   uploaded_by: string;
-  set_active?: boolean;
 }): Promise<Result<Template>> {
   const supabase = await createServerClient();
   const language = params.language ?? "en";
 
-  // Get next version number
-  const version = await getNextVersion(params.report_type, params.file_type, language);
-
-  // If set_active is true, deactivate existing active templates first
-  // to avoid unique constraint violation (template_report_type_file_type_active_idx)
-  if (params.set_active) {
-    await supabase
-      .from("template")
-      .update({ is_active: false })
-      .eq("report_type", params.report_type)
-      .eq("file_type", params.file_type)
-      .eq("language", language)
-      .eq("is_active", true);
-  }
+  const version = await getNextVersion(params.report_type, language);
 
   const { data, error } = await supabase
     .from("template")
     .insert({
       name: params.name,
       report_type: params.report_type,
-      file_type: params.file_type,
       language,
-      file_path: params.file_path,
+      template_file_path: params.template_file_path,
+      schema_file_path: params.schema_file_path ?? null,
       version,
-      is_active: false, // Always insert as inactive first, then activate
       uploaded_by: params.uploaded_by,
     })
     .select()
     .single();
 
   if (error) {
-    if (error.code === "23505") {
-      return err("Template version conflict. Please try again.");
-    }
     return err(error.message);
   }
 
   if (!data) return err("Failed to create template");
-
-  // If set_active is true, activate this template
-  if (params.set_active) {
-    const activateResult = await activateTemplate(data.id);
-    if (!activateResult.ok) {
-      return activateResult;
-    }
-    return activateResult;
-  }
-
-  return ok(data as Template);
-}
-
-/**
- * Activate a template (deactivates others in the same group)
- */
-export async function activateTemplate(id: string): Promise<Result<Template>> {
-  const supabase = await createServerClient();
-
-  // First, get the template to know its group
-  const templateResult = await getTemplate(id);
-  if (!templateResult.ok) return templateResult;
-
-  const template = templateResult.data;
-
-  // Deactivate all templates in the same group
-  const { error: deactivateError } = await supabase
-    .from("template")
-    .update({ is_active: false })
-    .eq("report_type", template.report_type)
-    .eq("file_type", template.file_type)
-    .eq("language", template.language);
-
-  if (deactivateError) return err(deactivateError.message);
-
-  // Activate the target template
-  const { data, error: activateError } = await supabase
-    .from("template")
-    .update({ is_active: true })
-    .eq("id", id)
-    .select()
-    .single();
-
-  if (activateError) return err(activateError.message);
-  if (!data) return err("Failed to activate template");
 
   return ok(data as Template);
 }
@@ -366,18 +284,10 @@ export async function updateTemplate(
 }
 
 /**
- * Delete a template (soft delete by deactivating, or hard delete if not active)
+ * Delete a template
  */
 export async function deleteTemplate(id: string): Promise<Result<null>> {
   const supabase = await createServerClient();
-
-  // Check if template is active
-  const templateResult = await getTemplate(id);
-  if (!templateResult.ok) return templateResult;
-
-  if (templateResult.data.is_active) {
-    return err("Cannot delete an active template. Activate another version first.");
-  }
 
   const { error } = await supabase.from("template").delete().eq("id", id);
 

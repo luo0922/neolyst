@@ -81,18 +81,18 @@ comment on column public.coverage_analyst.updated_at is '最后更新时间（UT
 -- ============================================================
 -- template 表
 -- ============================================================
-comment on table public.template is '报告模板表：存储报告模板文件信息，模板类型由report_type和file_type区分';
+comment on table public.template is '报告模板表：存储报告 Word 模板文件信息，每种报告类型+语言按 version 倒序取最新一条，不区分 report/model 类型';
 comment on column public.template.id is '主键UUID';
-comment on column public.template.name is '模板名称（如"公司报告模板"）';
-comment on column public.template.report_type is '报告类型代码（如company/sector/company_flash等），来源事实源template表';
-comment on column public.template.file_type is '文件类型：report=报告正文模板，model=模型模板';
-comment on column public.template.file_path is '模板文件存储路径（Supabase Storage路径）';
-comment on column public.template.version is '版本号（>=1），同一(report_type, file_type, language)内递增';
-comment on column public.template.is_active is '是否激活：true=激活（可用于提交），false=未激活（不可用）';
-comment on column public.template.uploaded_by is '上传人ID，关联auth.users，初始化占位模板允许为空';
+comment on column public.template.name is '模板名称（如"公司报告模板v1"）';
+comment on column public.template.report_type is '报告类型代码（如 company/sector/company_flash 等），值来自 report_type 表';
+comment on column public.template.template_file_path is 'Word 模板文件存储路径（Supabase Storage templates bucket 下的路径），非空时表示模板文件已上传';
+comment on column public.template.schema_file_path is 'Word schema 描述文件存储路径（Supabase Storage 下的 JSON 文件路径），描述模板所需的字段名称、位置和特征，可为空';
+comment on column public.template.version is '版本号（>=1），同一 (report_type, language) 内递增，每次上传新版本时自动分配';
+comment on column public.template.sort is '排序序号（整数，数字越小越靠前），用于 Templates 列表排序';
+comment on column public.template.uploaded_by is '上传人ID，关联 auth.users，初始化占位模板允许为空';
+comment on column public.template.language is '模板语言：en=英文模板，zh=中文模板';
 comment on column public.template.created_at is '创建时间（UTC）';
 comment on column public.template.updated_at is '最后更新时间（UTC）';
-comment on column public.template.language is '模板语言：en=英文模板，zh=中文模板';
 
 -- ============================================================
 -- report 表

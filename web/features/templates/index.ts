@@ -10,12 +10,10 @@ export {
   listTemplatesGroupedAction,
   listTemplatesAction,
   getTemplateAction,
-  getActiveTemplateAction,
   createTemplateAction,
-  activateTemplateAction,
   updateTemplateAction,
   deleteTemplateAction,
 } from "./actions";
 
 // Types
-export type { Template, TemplateGroup, ReportType, FileType } from "./repo/templates-repo";
+export type { Template, TemplateGroup, ReportType } from "./repo/templates-repo";

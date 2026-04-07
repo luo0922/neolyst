@@ -15,18 +15,15 @@ type StorageUploadResult =
   | { ok: false; error: string };
 
 import {
-  activateTemplate as activateTemplateRepo,
   createTemplate as createTemplateRepo,
   deleteTemplate as deleteTemplateRepo,
   getTemplate as getTemplateRepo,
-  getActiveTemplate as getActiveTemplateRepo,
   listTemplates as listTemplatesRepo,
   listTemplatesGrouped as listTemplatesGroupedRepo,
   listTemplateReportTypes as listTemplateReportTypesRepo,
   type Template,
   type TemplateGroup,
   type ReportType,
-  type FileType,
 } from "./repo/templates-repo";
 
 async function requireAdminOrThrow() {
@@ -34,7 +31,7 @@ async function requireAdminOrThrow() {
 }
 
 /**
- * List all templates grouped by report_type and file_type
+ * List all templates grouped by report_type and language
  */
 export async function listTemplatesGroupedAction(): Promise<
   Result<TemplateGroup[]>
@@ -53,8 +50,6 @@ export async function listTemplatesGroupedAction(): Promise<
  */
 export async function listTemplatesAction(params?: {
   report_type?: ReportType;
-  file_type?: FileType;
-  is_active?: boolean;
 }): Promise<Result<Template[]>> {
   await requireAdminOrThrow();
 
@@ -90,30 +85,14 @@ export async function getTemplateAction(id: string): Promise<Result<Template>> {
 }
 
 /**
- * Get the active template for a report type and file type
- */
-export async function getActiveTemplateAction(
-  report_type: ReportType,
-  file_type: FileType,
-): Promise<Result<Template>> {
-  await requireAdminOrThrow();
-
-  try {
-    return await getActiveTemplateRepo(report_type, file_type);
-  } catch {
-    return err("Failed to get active template.");
-  }
-}
-
-/**
  * Create a new template version
  */
 export async function createTemplateAction(input: {
   name: string;
   report_type: ReportType;
-  file_type: FileType;
   language?: "en" | "zh";
-  file_path: string;
+  template_file_path: string;
+  schema_file_path?: string | null;
 }): Promise<Result<Template>> {
   await requireAdminOrThrow();
 
@@ -130,26 +109,11 @@ export async function createTemplateAction(input: {
   const result = await createTemplateRepo({
     ...parsed.data,
     language: input.language,
-    file_path: input.file_path,
+    template_file_path: input.template_file_path,
+    schema_file_path: input.schema_file_path ?? null,
     uploaded_by: user.id,
-    set_active: true, // New templates are activated by default
   });
 
-  if (result.ok) {
-    revalidatePath("/templates");
-  }
-  return result;
-}
-
-/**
- * Activate a template version
- */
-export async function activateTemplateAction(
-  id: string,
-): Promise<Result<Template>> {
-  await requireAdminOrThrow();
-
-  const result = await activateTemplateRepo(id);
   if (result.ok) {
     revalidatePath("/templates");
   }
@@ -199,15 +163,15 @@ export async function uploadTemplateFileAction(
 
   const file = formData.get("file") as File | null;
   const reportType = formData.get("reportType") as string | null;
-  const fileType = formData.get("fileType") as string | null;
+  const fileKind = formData.get("fileKind") as string | null; // "template" or "schema"
 
-  if (!file || !reportType || !fileType) {
+  if (!file || !reportType || !fileKind) {
     return { ok: false, error: "Missing required fields." };
   }
 
   const safeName = file.name.replace(/[^a-zA-Z0-9._-]/g, "_");
   const timestamp = new Date().toISOString().replace(/[:.]/g, "-");
-  const filePath = `${reportType}/${fileType}/${timestamp}_${safeName}`;
+  const filePath = `${reportType}/${fileKind}/${timestamp}_${safeName}`;
 
   const supabase = createServiceRoleClient();
   const arrayBuffer = await file.arrayBuffer();

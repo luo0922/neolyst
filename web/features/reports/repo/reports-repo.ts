@@ -383,16 +383,15 @@ export async function hasValidTemplateForReportType(
 
   const { data, error } = await supabase
     .from("template")
-    .select("id, file_path")
-    .eq("report_type", reportType)
-    .eq("is_active", true);
+    .select("id, template_file_path")
+    .eq("report_type", reportType);
 
   if (error) {
     return err(error.message);
   }
 
   const valid = (data ?? []).some(
-    (row) => Boolean(row.file_path && row.file_path.trim().length > 0),
+    (row) => Boolean(row.template_file_path && row.template_file_path.trim().length > 0),
   );
   return ok(valid);
 }
