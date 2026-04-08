@@ -69,10 +69,27 @@ BEGIN
 END
 $$;
 
--- 7. 删除旧唯一约束（同名模板可重复上传，按 created_at 区分最新版本）
+-- 7. 删除旧唯一约束，添加新的唯一约束 (report_type, language, version)
 ALTER TABLE public.template
   DROP CONSTRAINT IF EXISTS template_uniq_version;
--- 不再添加任何唯一约束
+
+-- 清理重复记录，只保留每个 (report_type, language, version) 组合中最新的记录
+WITH ranked_templates AS (
+  SELECT
+    id,
+    ROW_NUMBER() OVER (
+      PARTITION BY report_type, language, version
+      ORDER BY created_at DESC, id DESC
+    ) as rn
+  FROM public.template
+)
+DELETE FROM public.template
+WHERE id IN (SELECT id FROM ranked_templates WHERE rn > 1);
+
+-- 添加新的唯一约束，防止同一 (report_type, language, version) 组合重复
+ALTER TABLE public.template
+  ADD CONSTRAINT template_uniq_version
+  UNIQUE (report_type, language, version);
 
 -- 8. 更新分组索引
 DROP INDEX IF EXISTS idx_template_group;

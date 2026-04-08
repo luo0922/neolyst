@@ -15,7 +15,6 @@ create extension if not exists citext;
 -- ============================================================
 
 -- 自动更新时间戳
-comment on function public.set_updated_at_utc() is '触发器函数：自动将updated_at字段更新为当前UTC时间';
 create or replace function public.set_updated_at_utc()
 returns trigger
 language plpgsql
@@ -25,9 +24,9 @@ begin
   return new;
 end;
 $$;
+comment on function public.set_updated_at_utc() is '触发器函数：自动将updated_at字段更新为当前UTC时间';
 
 -- 获取当前应用角色
-comment on function public.current_app_role() is '获取当前用户的应用角色（从JWT的app_metadata.role读取）';
 create or replace function public.current_app_role()
 returns text
 language sql
@@ -35,9 +34,9 @@ stable
 as $$
   select coalesce(auth.jwt()->'app_metadata'->>'role', '');
 $$;
+comment on function public.current_app_role() is '获取当前用户的应用角色（从JWT的app_metadata.role读取）';
 
 -- 报告状态转换验证
-comment on function public.report_status_is_valid(text, text) is '验证报告状态转换是否合法：draft->submitted, submitted->published/rejected, rejected->draft';
 create or replace function public.report_status_is_valid(from_status text, to_status text)
 returns boolean
 language sql
@@ -49,9 +48,9 @@ as $$
     or (from_status = 'rejected' and to_status = 'draft')
   );
 $$;
+comment on function public.report_status_is_valid(text, text) is '验证报告状态转换是否合法：draft->submitted, submitted->published/rejected, rejected->draft';
 
 -- 获取用户全名
-comment on function public.get_user_full_name(uuid) is '根据用户ID获取用户在auth.users中的full_name';
 create or replace function public.get_user_full_name(p_user_id uuid)
 returns text
 language plpgsql
@@ -69,9 +68,9 @@ begin
   return v_full_name;
 end;
 $$;
+comment on function public.get_user_full_name(uuid) is '根据用户ID获取用户在auth.users中的full_name';
 
 -- append-only 表保护
-comment on function public.prevent_update_delete_append_only() is '触发器函数：禁止对append-only表的UPDATE和DELETE操作';
 create or replace function public.prevent_update_delete_append_only()
 returns trigger
 language plpgsql
@@ -80,6 +79,7 @@ begin
   raise exception 'append-only table: update/delete is not allowed';
 end;
 $$;
+comment on function public.prevent_update_delete_append_only() is '触发器函数：禁止对append-only表的UPDATE和DELETE操作';
 
 -- ============================================================
 -- 3. Storage Buckets
@@ -100,7 +100,6 @@ on conflict (id) do nothing;
 -- ============================================================
 
 -- region 表
-comment on table public.region is '区域表：存储研究覆盖的地理区域信息，支持中英文名称和ISO 3166-1 alpha-2编码';
 create table public.region (
   id uuid primary key default gen_random_uuid(),
   name_en text not null,
@@ -113,6 +112,7 @@ create table public.region (
   constraint uk_region_name_cn unique (name_cn)
 );
 
+comment on table public.region is '区域表：存储研究覆盖的地理区域信息，支持中英文名称和ISO 3166-1 alpha-2编码';
 comment on column public.region.id is '主键UUID';
 comment on column public.region.name_en is '区域英文名称';
 comment on column public.region.name_cn is '区域中文名称';
@@ -127,7 +127,6 @@ create trigger trg_region_updated_at
   for each row execute function public.set_updated_at_utc();
 
 -- rating 表
-comment on table public.rating is '投资评级表：存储研究报告的投资评级选项';
 create table public.rating (
   id uuid primary key default gen_random_uuid(),
   name text not null,
@@ -137,6 +136,7 @@ create table public.rating (
   created_at timestamptz not null default now()
 );
 
+comment on table public.rating is '投资评级表：存储研究报告的投资评级选项';
 comment on column public.rating.id is '主键UUID';
 comment on column public.rating.name is '评级名称（中文）';
 comment on column public.rating.code is '评级代码（英文缩写）';
@@ -149,7 +149,6 @@ create index idx_rating_code on public.rating(code);
 create index idx_rating_is_active on public.rating(is_active);
 
 -- report_type 表
-comment on table public.report_type is '报告类型表：存储研究报告的分类选项';
 create table public.report_type (
   id uuid primary key default gen_random_uuid(),
   name text not null,
@@ -159,6 +158,7 @@ create table public.report_type (
   created_at timestamptz not null default now()
 );
 
+comment on table public.report_type is '报告类型表：存储研究报告的分类选项';
 comment on column public.report_type.id is '主键UUID';
 comment on column public.report_type.name is '报告类型名称（中文）';
 comment on column public.report_type.code is '报告类型代码（英文）';
@@ -174,7 +174,6 @@ create index idx_report_type_is_active on public.report_type(is_active);
 -- 5. 分析师表
 -- ============================================================
 
-comment on table public.analyst is '分析师信息表：存储分析师的详细资料，与auth.users解耦';
 create table public.analyst (
   id uuid primary key default gen_random_uuid(),
   full_name text not null,
@@ -188,6 +187,7 @@ create table public.analyst (
   updated_at timestamptz not null default now()
 );
 
+comment on table public.analyst is '分析师信息表：存储分析师的详细资料，与auth.users解耦';
 comment on column public.analyst.id is '主键UUID';
 comment on column public.analyst.full_name is '分析师英文全名';
 comment on column public.analyst.chinese_name is '分析师中文名';
@@ -215,7 +215,6 @@ create trigger trg_analyst_updated_at
 -- ============================================================
 
 -- 层级验证函数
-comment on function public.validate_sector_hierarchy() is '触发器函数：验证行业分类层级结构合法性（两级，禁止循环，禁止跨级引用）';
 create or replace function public.validate_sector_hierarchy()
 returns trigger
 language plpgsql
@@ -255,8 +254,8 @@ begin
   return new;
 end;
 $$;
+comment on function public.validate_sector_hierarchy() is '触发器函数：验证行业分类层级结构合法性（两级，禁止循环，禁止跨级引用）';
 
-comment on table public.sector is '行业分类表：存储两级行业分类体系（level=1一级/level=2二级），通过parent_id建立层级关系';
 create table public.sector (
   id uuid primary key default gen_random_uuid(),
   level smallint not null check (level in (1, 2)),
@@ -273,6 +272,7 @@ create table public.sector (
   )
 );
 
+comment on table public.sector is '行业分类表：存储两级行业分类体系（level=1一级/level=2二级），通过parent_id建立层级关系';
 comment on column public.sector.id is '主键UUID';
 comment on column public.sector.level is '层级：1=一级行业，2=二级行业';
 comment on column public.sector.parent_id is '父级行业ID（level=1时必须为空，level=2时必须引用level=1的记录）';
@@ -303,7 +303,6 @@ create trigger trg_sector_updated_at
 -- 7. 公司覆盖表
 -- ============================================================
 
-comment on table public.coverage is '公司覆盖表：存储被研究覆盖的上市公司基本信息';
 create table public.coverage (
   id uuid primary key default gen_random_uuid(),
   ticker text not null,
@@ -323,6 +322,7 @@ create table public.coverage (
   updated_at timestamptz not null default now()
 );
 
+comment on table public.coverage is '公司覆盖表：存储被研究覆盖的上市公司基本信息';
 comment on column public.coverage.id is '主键UUID';
 comment on column public.coverage.ticker is '股票代码（唯一，存储时统一处理大小写和空格）';
 comment on column public.coverage.english_full_name is '公司英文全称';
@@ -355,7 +355,6 @@ create trigger trg_coverage_updated_at
 -- ============================================================
 
 -- 分析师数量限制验证函数
-comment on function public.validate_coverage_analyst_limit() is '触发器函数：验证每个coverage最多关联4位分析师';
 create or replace function public.validate_coverage_analyst_limit()
 returns trigger
 language plpgsql
@@ -387,8 +386,8 @@ begin
   return new;
 end;
 $$;
+comment on function public.validate_coverage_analyst_limit() is '触发器函数：验证每个coverage最多关联4位分析师';
 
-comment on table public.coverage_analyst is '覆盖-分析师关系表：建立公司与分析师的覆盖关系，每公司最多4位分析师';
 create table public.coverage_analyst (
   id uuid primary key default gen_random_uuid(),
   coverage_id uuid not null references public.coverage(id) on delete cascade,
@@ -401,6 +400,7 @@ create table public.coverage_analyst (
   constraint coverage_analyst_uniq_sort unique (coverage_id, sort_order)
 );
 
+comment on table public.coverage_analyst is '覆盖-分析师关系表：建立公司与分析师的覆盖关系，每公司最多4位分析师';
 comment on column public.coverage_analyst.id is '主键UUID';
 comment on column public.coverage_analyst.coverage_id is '覆盖公司ID，关联coverage.id，删除公司时级联删除';
 comment on column public.coverage_analyst.analyst_id is '分析师ID，关联analyst.id，禁止删除已关联分析师';
@@ -424,7 +424,6 @@ create trigger trg_coverage_analyst_updated_at
 -- 9. 模板表
 -- ============================================================
 
-comment on table public.template is '报告模板表：存储报告 Word 模板文件信息，每种报告类型+语言按 created_at 倒序取最新一条，不区分 report/model 类型';
 create table public.template (
   id uuid primary key default gen_random_uuid(),
   name text not null,
@@ -437,9 +436,11 @@ create table public.template (
   language text not null default 'en',
   created_at timestamptz not null default now(),
   updated_at timestamptz not null default now(),
-  constraint template_language_check check (language in ('en', 'zh'))
+  constraint template_language_check check (language in ('en', 'zh')),
+  constraint template_uniq_version unique (report_type, language, version)
 );
 
+comment on table public.template is '报告模板表：存储报告 Word 模板文件信息，每种报告类型+语言按 created_at 倒序取最新一条，不区分 report/model 类型';
 comment on column public.template.id is '主键UUID';
 comment on column public.template.name is '模板名称（如"公司报告模板v1"）';
 comment on column public.template.report_type is '报告类型代码（如 company/sector/company_flash 等），值来自 report_type 表';
@@ -464,7 +465,6 @@ create trigger trg_template_updated_at
 -- ============================================================
 
 -- 报告所有者不可变更验证
-comment on function public.report_enforce_owner_immutable() is '触发器函数：禁止修改报告的owner_user_id';
 create or replace function public.report_enforce_owner_immutable()
 returns trigger
 language plpgsql
@@ -476,9 +476,9 @@ begin
   return new;
 end;
 $$;
+comment on function public.report_enforce_owner_immutable() is '触发器函数：禁止修改报告的owner_user_id';
 
 -- 报告状态转换验证
-comment on function public.report_enforce_status_transition() is '触发器函数：验证报告状态转换合法性';
 create or replace function public.report_enforce_status_transition()
 returns trigger
 language plpgsql
@@ -492,8 +492,8 @@ begin
   return new;
 end;
 $$;
+comment on function public.report_enforce_status_transition() is '触发器函数：验证报告状态转换合法性';
 
-comment on table public.report is '研究报告主表：存储报告的核心信息，支持草稿/提交/发布/驳回状态流转';
 create table public.report (
   id uuid primary key default gen_random_uuid(),
   owner_user_id uuid not null references auth.users(id) on delete restrict,
@@ -517,6 +517,7 @@ create table public.report (
   updated_at timestamptz not null default now()
 );
 
+comment on table public.report is '研究报告主表：存储报告的核心信息，支持草稿/提交/发布/驳回状态流转';
 comment on column public.report.id is '主键UUID';
 comment on column public.report.owner_user_id is '报告所有者用户ID，关联auth.users，创建后不可变更';
 comment on column public.report.title is '报告标题';
@@ -561,7 +562,6 @@ create trigger trg_report_status_transition
 -- 11. 报告版本表 (append-only)
 -- ============================================================
 
-comment on table public.report_version is '报告版本表（append-only）：记录报告每次提交的快照和文件信息，不允许修改或删除';
 create table public.report_version (
   id uuid primary key default gen_random_uuid(),
   report_id uuid not null references public.report(id) on delete cascade,
@@ -579,6 +579,7 @@ create table public.report_version (
   constraint report_version_uniq unique (report_id, version_no)
 );
 
+comment on table public.report_version is '报告版本表（append-only）：记录报告每次提交的快照和文件信息，不允许修改或删除';
 comment on column public.report_version.id is '主键UUID';
 comment on column public.report_version.report_id is '所属报告ID，关联report.id，删除报告时级联删除';
 comment on column public.report_version.version_no is '版本号（>=1），同一报告内递增';
@@ -606,7 +607,6 @@ create trigger trg_report_version_no_update
 -- 12. 报告-分析师关系表
 -- ============================================================
 
-comment on table public.report_analyst is '报告-分析师关系表：建立报告与分析师的作者关系';
 create table public.report_analyst (
   id uuid primary key default gen_random_uuid(),
   report_id uuid not null references public.report(id) on delete cascade,
@@ -619,6 +619,7 @@ create table public.report_analyst (
   constraint report_analyst_uniq_sort unique (report_id, sort_order)
 );
 
+comment on table public.report_analyst is '报告-分析师关系表：建立报告与分析师的作者关系';
 comment on column public.report_analyst.id is '主键UUID';
 comment on column public.report_analyst.report_id is '报告ID，关联report.id，删除报告时级联删除';
 comment on column public.report_analyst.analyst_id is '分析师ID，关联analyst.id，禁止删除已关联分析师';
@@ -639,7 +640,6 @@ create trigger trg_report_analyst_updated_at
 -- ============================================================
 
 -- 状态日志转换验证
-comment on function public.report_status_log_enforce_transition() is '触发器函数：验证状态日志记录的状态转换合法性';
 create or replace function public.report_status_log_enforce_transition()
 returns trigger
 language plpgsql
@@ -654,8 +654,8 @@ begin
   return new;
 end;
 $$;
+comment on function public.report_status_log_enforce_transition() is '触发器函数：验证状态日志记录的状态转换合法性';
 
-comment on table public.report_status_log is '报告状态变更日志表（append-only）：记录报告所有状态流转历史，不允许修改或删除';
 create table public.report_status_log (
   id uuid primary key default gen_random_uuid(),
   report_id uuid not null references public.report(id) on delete cascade,
@@ -671,6 +671,7 @@ create table public.report_status_log (
     check ((to_status <> 'rejected') or (reason is not null and btrim(reason) <> ''))
 );
 
+comment on table public.report_status_log is '报告状态变更日志表（append-only）：记录报告所有状态流转历史，不允许修改或删除';
 comment on column public.report_status_log.id is '主键UUID';
 comment on column public.report_status_log.report_id is '报告ID，关联report.id，删除报告时级联删除';
 comment on column public.report_status_log.from_status is '变更前状态';
@@ -698,7 +699,6 @@ create trigger trg_report_status_log_transition
 -- 14. 首席确认附件表
 -- ============================================================
 
-comment on table public.chief_approve is '首席确认附件表：存储首席审核确认时的附件信息';
 create table public.chief_approve (
   id uuid primary key default gen_random_uuid(),
   report_id uuid not null references public.report(id) on delete cascade,
@@ -708,6 +708,7 @@ create table public.chief_approve (
   created_at timestamptz not null default now()
 );
 
+comment on table public.chief_approve is '首席确认附件表：存储首席审核确认时的附件信息';
 comment on column public.chief_approve.id is '主键UUID';
 comment on column public.chief_approve.report_id is '关联报告ID';
 comment on column public.chief_approve.file_path is '文件存储路径';
@@ -722,7 +723,6 @@ create index idx_chief_approve_created_at on public.chief_approve(created_at);
 -- 15. RQC审批确认附件表
 -- ============================================================
 
-comment on table public.rqc_approve is 'RQC审批确认附件表：存储RQC审核确认时的附件信息';
 create table public.rqc_approve (
   id uuid primary key default gen_random_uuid(),
   report_id uuid not null references public.report(id) on delete cascade,
@@ -732,6 +732,7 @@ create table public.rqc_approve (
   created_at timestamptz not null default now()
 );
 
+comment on table public.rqc_approve is 'RQC审批确认附件表：存储RQC审核确认时的附件信息';
 comment on column public.rqc_approve.id is '主键UUID';
 comment on column public.rqc_approve.report_id is '关联报告ID';
 comment on column public.rqc_approve.file_path is '文件存储路径';
@@ -746,7 +747,6 @@ create index idx_rqc_approve_created_at on public.rqc_approve(created_at);
 -- 16. 报告外部推送日志表 (append-only)
 -- ============================================================
 
-comment on table public.report_push_log is '报告外部推送日志记录表';
 create table public.report_push_log (
   id uuid primary key default gen_random_uuid(),
   report_id uuid not null references public.report(id) on delete cascade,
@@ -760,6 +760,7 @@ create table public.report_push_log (
   created_at timestamptz not null default now()
 );
 
+comment on table public.report_push_log is '报告外部推送日志记录表';
 comment on column public.report_push_log.report_id is '关联报告ID';
 comment on column public.report_push_log.status is '推送状态: success/failed/pending';
 comment on column public.report_push_log.http_status_code is '外部接口返回的HTTP状态码';
@@ -788,7 +789,6 @@ create trigger trg_report_push_log_no_update_delete
 -- ============================================================
 
 -- 原子化保存报告内容
-comment on function public.report_save_content_atomic(uuid, text, text, text, text, text, text, uuid, text, uuid, text, boolean, uuid, jsonb, uuid, text, text, text, text, text, text) is '原子化保存报告内容的RPC函数：在单事务内更新报告基本信息、作者关系和版本快照';
 create or replace function public.report_save_content_atomic(
   p_report_id uuid,
   p_title text,
@@ -910,9 +910,9 @@ begin
   return v_report;
 end;
 $$;
+comment on function public.report_save_content_atomic(uuid, text, text, text, text, text, text, uuid, text, uuid, text, boolean, uuid, jsonb, uuid, text, text, text, text, text, text) is '原子化保存报告内容的RPC函数：在单事务内更新报告基本信息、作者关系和版本快照';
 
 -- 原子化变更报告状态
-comment on function public.report_change_status_atomic(uuid, text, uuid, text) is '原子化变更报告状态的RPC函数：在单事务内更新状态并写入状态日志';
 create or replace function public.report_change_status_atomic(
   p_report_id uuid,
   p_to_status text,
@@ -1009,6 +1009,7 @@ begin
   return v_updated;
 end;
 $$;
+comment on function public.report_change_status_atomic(uuid, text, uuid, text) is '原子化变更报告状态的RPC函数：在单事务内更新状态并写入状态日志';
 
 -- ============================================================
 -- 18. RLS 策略

@@ -16,6 +16,7 @@ import {
   createTemplateAction,
   deleteTemplateAction,
   uploadTemplateFileAction,
+  updateTemplateFileAction,
 } from "../actions";
 import type {
   TemplateGroup,
@@ -63,6 +64,8 @@ export function TemplatesPageClient({
   const [uploadErrors, setUploadErrors] = React.useState<
     Record<string, string>
   >({});
+  // Track if we're updating an existing template (true) or creating new (false)
+  const [isUpdateMode, setIsUpdateMode] = React.useState(false);
 
   // Delete confirm
   const [deleteOpen, setDeleteOpen] = React.useState(false);
@@ -80,6 +83,8 @@ export function TemplatesPageClient({
     setUploadTemplateFile(null);
     setUploadSchemaFile(null);
     setUploadErrors({});
+    // If reportType and language are provided, we're in update mode
+    setIsUpdateMode(!!reportType && !!language);
     setUploadOpen(true);
   }
 
@@ -156,22 +161,43 @@ export function TemplatesPageClient({
         schemaFilePath = schemaResult.file_path;
       }
 
-      const res = await createTemplateAction({
-        name,
-        report_type: uploadReportType,
-        language: uploadLanguage,
-        template_file_path: templateResult.file_path,
-        schema_file_path: schemaFilePath,
-      });
+      if (isUpdateMode) {
+        // Update existing template file
+        const res = await updateTemplateFileAction({
+          name: name || undefined,
+          report_type: uploadReportType,
+          language: uploadLanguage,
+          template_file_path: templateResult.file_path,
+          schema_file_path: schemaFilePath,
+        });
 
-      if (!res.ok) {
-        toast.error(res.error, { title: "Error" });
-        setUploadLoading(false);
-        return;
+        if (!res.ok) {
+          toast.error(res.error, { title: "Error" });
+          setUploadLoading(false);
+          return;
+        }
+
+        setUploadOpen(false);
+        toast.success("Template updated.", { title: "Success" });
+      } else {
+        // Create new template
+        const res = await createTemplateAction({
+          name,
+          report_type: uploadReportType,
+          language: uploadLanguage,
+          template_file_path: templateResult.file_path,
+          schema_file_path: schemaFilePath,
+        });
+
+        if (!res.ok) {
+          toast.error(res.error, { title: "Error" });
+          setUploadLoading(false);
+          return;
+        }
+
+        setUploadOpen(false);
+        toast.success("Template uploaded.", { title: "Success" });
       }
-
-      setUploadOpen(false);
-      toast.success("Template uploaded.", { title: "Success" });
       router.refresh();
     } catch {
       toast.error("Failed to upload template", { title: "Error" });
@@ -297,7 +323,7 @@ export function TemplatesPageClient({
 
       <Modal
         open={uploadOpen}
-        title="Upload Template"
+        title={isUpdateMode ? "Upload New Version" : "Upload Template"}
         onClose={() => setUploadOpen(false)}
         footer={
           <>
@@ -309,7 +335,7 @@ export function TemplatesPageClient({
               Cancel
             </Button>
             <Button type="submit" form="upload-form" isLoading={uploadLoading}>
-              Upload
+              {isUpdateMode ? "Update" : "Upload"}
             </Button>
           </>
         }

@@ -284,6 +284,85 @@ export async function updateTemplate(
 }
 
 /**
+ * Update template file for a report_type and language (update existing record, not create new version)
+ */
+export async function updateTemplateFile(params: {
+  report_type: ReportType;
+  language: "en" | "zh";
+  name?: string;
+  template_file_path?: string;
+  schema_file_path?: string | null;
+  uploaded_by: string;
+}): Promise<Result<Template>> {
+  const supabase = await createServerClient();
+
+  // Find the existing template for this report_type and language
+  const { data: existing, error: findError } = await supabase
+    .from("template")
+    .select("*")
+    .eq("report_type", params.report_type)
+    .eq("language", params.language)
+    .order("version", { ascending: false })
+    .limit(1)
+    .single();
+
+  if (findError && findError.code !== "PGRST116") {
+    // PGRST116 = no rows returned
+    return err(findError.message);
+  }
+
+  if (existing) {
+    // Update existing record
+    const updateData: Record<string, unknown> = {
+      uploaded_by: params.uploaded_by,
+      updated_at: new Date().toISOString(),
+    };
+
+    if (params.name !== undefined) {
+      updateData.name = params.name;
+    }
+    if (params.template_file_path !== undefined) {
+      updateData.template_file_path = params.template_file_path;
+    }
+    if (params.schema_file_path !== undefined) {
+      updateData.schema_file_path = params.schema_file_path;
+    }
+
+    const { data, error } = await supabase
+      .from("template")
+      .update(updateData)
+      .eq("id", existing.id)
+      .select()
+      .single();
+
+    if (error) return err(error.message);
+    if (!data) return err("Failed to update template");
+
+    return ok(data as Template);
+  } else {
+    // No existing template, create new one with version 1
+    const { data, error } = await supabase
+      .from("template")
+      .insert({
+        name: params.name || `${params.report_type}_template`,
+        report_type: params.report_type,
+        language: params.language,
+        template_file_path: params.template_file_path || "",
+        schema_file_path: params.schema_file_path ?? null,
+        version: 1,
+        uploaded_by: params.uploaded_by,
+      })
+      .select()
+      .single();
+
+    if (error) return err(error.message);
+    if (!data) return err("Failed to create template");
+
+    return ok(data as Template);
+  }
+}
+
+/**
  * Delete a template
  */
 export async function deleteTemplate(id: string): Promise<Result<null>> {

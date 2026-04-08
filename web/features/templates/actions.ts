@@ -21,6 +21,7 @@ import {
   listTemplates as listTemplatesRepo,
   listTemplatesGrouped as listTemplatesGroupedRepo,
   listTemplateReportTypes as listTemplateReportTypesRepo,
+  updateTemplateFile as updateTemplateFileRepo,
   type Template,
   type TemplateGroup,
   type ReportType,
@@ -111,6 +112,38 @@ export async function createTemplateAction(input: {
     language: input.language,
     template_file_path: input.template_file_path,
     schema_file_path: input.schema_file_path ?? null,
+    uploaded_by: user.id,
+  });
+
+  if (result.ok) {
+    revalidatePath("/templates");
+  }
+  return result;
+}
+
+/**
+ * Update template file for existing template (update current version, not create new)
+ */
+export async function updateTemplateFileAction(input: {
+  name?: string;
+  report_type: ReportType;
+  language?: "en" | "zh";
+  template_file_path?: string;
+  schema_file_path?: string | null;
+}): Promise<Result<Template>> {
+  await requireAdminOrThrow();
+
+  const user = await getCurrentUser();
+  if (!user) {
+    return err("Unauthorized");
+  }
+
+  const result = await updateTemplateFileRepo({
+    report_type: input.report_type,
+    language: input.language ?? "en",
+    name: input.name,
+    template_file_path: input.template_file_path,
+    schema_file_path: input.schema_file_path,
     uploaded_by: user.id,
   });
 
