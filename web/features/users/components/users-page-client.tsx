@@ -75,6 +75,7 @@ export function UsersPageClient({
     name?: string;
   }>({});
   const [inviteLoading, setInviteLoading] = React.useState(false);
+  const [inviteSuccessPw, setInviteSuccessPw] = React.useState<string | null>(null);
 
   // Edit modal
   const [editOpen, setEditOpen] = React.useState(false);
@@ -135,7 +136,7 @@ export function UsersPageClient({
     if (Object.keys(next).length) return;
 
     setInviteLoading(true);
-    const res = await inviteUserAction({ email, fullName, role: inviteRole });
+    const res = await inviteUserAction({ email, fullName, role: inviteRole, requireEmailConfirmation: false });
     setInviteLoading(false);
 
     if (!res.ok) {
@@ -144,7 +145,11 @@ export function UsersPageClient({
     }
 
     setInviteOpen(false);
-    toast.success("Invitation sent.", { title: "Success" });
+    if (res.data.password) {
+      setInviteSuccessPw(res.data.password);
+    } else {
+      toast.success("Invitation sent.", { title: "Success" });
+    }
     router.refresh();
   }
 
@@ -441,6 +446,27 @@ export function UsersPageClient({
             </select>
           </div>
         </form>
+      </Modal>
+
+      <Modal
+        open={!!inviteSuccessPw}
+        title="User created"
+        description="Share this temporary password with the user."
+        onClose={() => { setInviteSuccessPw(null); }}
+        footer={
+          <Button onClick={() => setInviteSuccessPw(null)}>
+            Done
+          </Button>
+        }
+      >
+        <div className="space-y-2">
+          <div className="rounded-[8px] border border-[var(--border-subtle)] bg-[var(--bg-surface)] px-4 py-3 font-mono text-base text-[var(--fg-primary)]">
+            {inviteSuccessPw}
+          </div>
+          <p className="text-sm text-[var(--fg-secondary)]">
+            Please share this password with the new user securely.
+          </p>
+        </div>
       </Modal>
 
       <Modal

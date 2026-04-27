@@ -156,7 +156,7 @@ export async function createUser(params: {
   const user = data.user;
   if (!user) throw new Error("Create user failed.");
 
-  return { id: user.id };
+  return { id: user.id, password: params.password };
 }
 
 export async function updateUser(params: {

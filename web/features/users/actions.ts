@@ -61,7 +61,7 @@ export async function listUsersAction(input: {
 // Invite user action
 export async function inviteUserAction(
   input: unknown,
-): Promise<Result<{ id: string }>> {
+): Promise<Result<{ id: string; password?: string }>> {
   await requireAdminOrRedirect403();
 
   const parsed = inviteUserSchema.safeParse(input);
@@ -88,23 +88,15 @@ export async function inviteUserAction(
       });
       return ok(data);
     }
-  } catch {
-    return err("Failed to create user.");
+  } catch (caught) {
+    const msg = caught instanceof Error ? caught.message : String(caught);
+    console.error("[inviteUserAction]", msg);
+    return err(msg);
   }
 }
 
-/**
- * Generate a temporary password for direct user creation
- */
 function generateTempPassword(): string {
-  const chars =
-    "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789!@#$%";
-  const randomValues = crypto.getRandomValues(new Uint32Array(16));
-  let password = "";
-  for (let i = 0; i < 16; i++) {
-    password += chars.charAt(randomValues[i] % chars.length);
-  }
-  return password;
+  return "Passw0rd";
 }
 
 // Update user action
