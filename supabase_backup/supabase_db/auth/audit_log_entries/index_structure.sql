@@ -1,0 +1,1 @@
+CREATE INDEX "audit_logs_instance_id_idx" ON "auth"."audit_log_entries" (instance_id);

@@ -7,7 +7,6 @@ import { ActionButton } from "@/components/ui/action-button";
 import { Button } from "@/components/ui/button";
 import { ConfirmModal } from "@/components/ui/confirm-modal";
 import { FileDropzone } from "@/components/ui/file-dropzone";
-import { Input } from "@/components/ui/input";
 import { Modal } from "@/components/ui/modal";
 import { Select } from "@/components/ui/select";
 import { useToast } from "@/components/ui/toast";
@@ -16,7 +15,6 @@ import {
   createTemplateAction,
   deleteTemplateAction,
   uploadTemplateFileAction,
-  updateTemplateFileAction,
 } from "../actions";
 import type {
   TemplateGroup,
@@ -57,15 +55,12 @@ export function TemplatesPageClient({
   const [uploadReportType, setUploadReportType] =
     React.useState<ReportType>("company");
   const [uploadLanguage, setUploadLanguage] = React.useState<Language>("en");
-  const [uploadName, setUploadName] = React.useState("");
   const [uploadTemplateFile, setUploadTemplateFile] = React.useState<File | null>(null);
   const [uploadSchemaFile, setUploadSchemaFile] = React.useState<File | null>(null);
   const [uploadLoading, setUploadLoading] = React.useState(false);
   const [uploadErrors, setUploadErrors] = React.useState<
     Record<string, string>
   >({});
-  // Track if we're updating an existing template (true) or creating new (false)
-  const [isUpdateMode, setIsUpdateMode] = React.useState(false);
 
   // Delete confirm
   const [deleteOpen, setDeleteOpen] = React.useState(false);
@@ -73,29 +68,21 @@ export function TemplatesPageClient({
   const [deleteLoading, setDeleteLoading] = React.useState(false);
 
   function openUpload(reportType?: ReportType, language?: Language) {
-    // Collect all available report types from both sources
-    const existingTypes = templateGroups.map(g => g.report_type);
+    const existingTypes = templateGroups.map((g) => g.report_type);
     const allTypes = [...new Set([...reportTypes, ...existingTypes])];
-    const defaultType = reportType ?? (allTypes.length > 0 ? allTypes[0] : "company");
+    const defaultType =
+      reportType ?? (allTypes.length > 0 ? allTypes[0] : "company");
     setUploadReportType(defaultType as ReportType);
     setUploadLanguage(language ?? "en");
-    setUploadName("");
     setUploadTemplateFile(null);
     setUploadSchemaFile(null);
     setUploadErrors({});
-    // If reportType and language are provided, we're in update mode
-    setIsUpdateMode(!!reportType && !!language);
     setUploadOpen(true);
   }
 
   async function submitUpload(e: React.FormEvent) {
     e.preventDefault();
 
-    const name = uploadName.trim();
-    if (!name) {
-      setUploadErrors({ name: "Name is required" });
-      return;
-    }
     if (!uploadTemplateFile) {
       setUploadErrors({ template_file: "Template file is required" });
       return;
@@ -161,43 +148,23 @@ export function TemplatesPageClient({
         schemaFilePath = schemaResult.file_path;
       }
 
-      if (isUpdateMode) {
-        // Update existing template file
-        const res = await updateTemplateFileAction({
-          name: name || undefined,
-          report_type: uploadReportType,
-          language: uploadLanguage,
-          template_file_path: templateResult.file_path,
-          schema_file_path: schemaFilePath,
-        });
+      // createTemplateAction auto-generates id = ${report_type}_${language}
+      // Uploading for the same (report_type, language) will upsert the record
+      const res = await createTemplateAction({
+        report_type: uploadReportType,
+        language: uploadLanguage,
+        template_file_path: templateResult.file_path,
+        schema_file_path: schemaFilePath,
+      });
 
-        if (!res.ok) {
-          toast.error(res.error, { title: "Error" });
-          setUploadLoading(false);
-          return;
-        }
-
-        setUploadOpen(false);
-        toast.success("Template updated.", { title: "Success" });
-      } else {
-        // Create new template
-        const res = await createTemplateAction({
-          name,
-          report_type: uploadReportType,
-          language: uploadLanguage,
-          template_file_path: templateResult.file_path,
-          schema_file_path: schemaFilePath,
-        });
-
-        if (!res.ok) {
-          toast.error(res.error, { title: "Error" });
-          setUploadLoading(false);
-          return;
-        }
-
-        setUploadOpen(false);
-        toast.success("Template uploaded.", { title: "Success" });
+      if (!res.ok) {
+        toast.error(res.error, { title: "Error" });
+        setUploadLoading(false);
+        return;
       }
+
+      setUploadOpen(false);
+      toast.success("Template uploaded.", { title: "Success" });
       router.refresh();
     } catch {
       toast.error("Failed to upload template", { title: "Error" });
@@ -261,7 +228,7 @@ export function TemplatesPageClient({
                     {LANGUAGE_LABELS[group.language]}
                   </span>
                   <span className="ml-3 rounded bg-[var(--bg-surface)]/80 px-2 py-0.5 text-xs text-[var(--fg-secondary)]">
-                    {group.templates.length} version{group.templates.length !== 1 ? "s" : ""}
+                    ID: {group.report_type}_{group.language}
                   </span>
                 </div>
                 <Button
@@ -274,14 +241,14 @@ export function TemplatesPageClient({
                   }
                   className="text-xs px-2 py-1"
                 >
-                  Upload New Version
+                  {group.templates.length > 0 ? "Replace Template" : "Upload Template"}
                 </Button>
               </div>
 
-              {/* Template versions list */}
+              {/* Template row (at most 1 in new schema) */}
               {group.templates.length === 0 ? (
                 <div className="px-4 py-3 text-[var(--fg-secondary)]">
-                  No template versions yet.
+                  No template uploaded yet.
                 </div>
               ) : (
                 <div className="divide-y divide-white/5">
@@ -291,19 +258,13 @@ export function TemplatesPageClient({
                       className="flex items-center justify-between px-4 py-3 hover:bg-white/5"
                     >
                       <div className="flex items-center gap-3">
-                        <span className="text-[var(--fg-primary)]">
-                          {template.name}
-                        </span>
-                        <span className="rounded bg-[var(--bg-surface)] px-1.5 py-0.5 text-xs text-[var(--fg-secondary)]">
-                          v{template.version}
-                        </span>
                         {template.schema_file_path && (
                           <span className="rounded bg-blue-500/20 px-1.5 py-0.5 text-xs text-blue-300">
                             Schema
                           </span>
                         )}
-                        <span className="text-sm text-[var(--fg-tertiary)]">
-                          {formatShanghaiYmd(template.created_at)}
+                        <span className="text-sm text-[var(--fg-secondary)]">
+                          {formatShanghaiYmd(template.updated_at)}
                         </span>
                       </div>
                       <ActionButton
@@ -323,7 +284,7 @@ export function TemplatesPageClient({
 
       <Modal
         open={uploadOpen}
-        title={isUpdateMode ? "Upload New Version" : "Upload Template"}
+        title="Upload Template"
         onClose={() => setUploadOpen(false)}
         footer={
           <>
@@ -335,7 +296,7 @@ export function TemplatesPageClient({
               Cancel
             </Button>
             <Button type="submit" form="upload-form" isLoading={uploadLoading}>
-              {isUpdateMode ? "Update" : "Upload"}
+              Upload
             </Button>
           </>
         }
@@ -349,7 +310,7 @@ export function TemplatesPageClient({
                 setUploadReportType(e.target.value as ReportType)
               }
               options={(() => {
-                const existingTypes = templateGroups.map(g => g.report_type);
+                const existingTypes = templateGroups.map((g) => g.report_type);
                 const allTypes = [...new Set([...reportTypes, ...existingTypes])];
                 if (allTypes.length === 0) {
                   return [
@@ -372,13 +333,6 @@ export function TemplatesPageClient({
               ]}
             />
           </div>
-          <Input
-            label="Template Name"
-            placeholder="e.g., Company Report Template v1"
-            value={uploadName}
-            onChange={(e) => setUploadName(e.target.value)}
-            error={uploadErrors.name}
-          />
           <div className="space-y-1.5">
             <FileDropzone
               label="Template File"

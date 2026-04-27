@@ -3,15 +3,16 @@ import "server-only";
 import type { Result } from "@/lib/result";
 
 import {
-  changeReportStatus,
   getReportDetail,
   listReports,
+  publishReport,
+  rejectReport,
+  retractReport,
   saveReportContent,
   type ReportDetail,
   type ReportSummary,
 } from "@/features/reports/repo/reports-repo";
 import type { ReportAnalystInput } from "@/domain/schemas/report";
-import { pushReportExternal } from "./report-push-repo";
 
 export async function listReviewReports(params: {
   page: number;
@@ -42,50 +43,31 @@ export async function approveReport(params: {
   report_id: string;
   action_by: string;
 }): Promise<Result<ReportDetail>> {
-  const statusResult = await changeReportStatus({
-    report_id: params.report_id,
-    to_status: "published",
-    action_by: params.action_by,
-  });
+  // New schema: calls publish_report RPC directly
+  const statusResult = await publishReport(params.report_id);
 
   if (!statusResult.ok) {
     return statusResult;
   }
 
-  // 异步触发外部推送（不阻塞审批响应）
-  pushReportExternal({
-    reportId: params.report_id,
-    triggeredBy: params.action_by,
-    triggerType: "auto",
-  }).catch((err) => {
-    console.error("External push failed:", err);
-  });
-
   return statusResult;
 }
 
-export async function rejectReport(params: {
+export async function rejectReportAction(params: {
   report_id: string;
   action_by: string;
   reason: string;
 }): Promise<Result<ReportDetail>> {
-  return changeReportStatus({
-    report_id: params.report_id,
-    to_status: "rejected",
-    action_by: params.action_by,
-    reason: params.reason,
-  });
+  // New schema: calls reject_report RPC with reason
+  return rejectReport(params.report_id, params.reason);
 }
 
-export async function reopenReport(params: {
+export async function reopenReportAction(params: {
   report_id: string;
   action_by: string;
 }): Promise<Result<ReportDetail>> {
-  return changeReportStatus({
-    report_id: params.report_id,
-    to_status: "draft",
-    action_by: params.action_by,
-  });
+  // New schema: calls retract_report RPC
+  return retractReport(params.report_id);
 }
 
 export async function saveReviewReportContent(params: {
@@ -98,18 +80,14 @@ export async function saveReviewReportContent(params: {
   region_code?: string | null;
   sector_id?: string | null;
   report_language?: "en" | "zh" | null;
-  contact_person_id?: string | null;
+  contact_person?: string | null;
   investment_thesis?: string | null;
-  certificate_confirmed?: boolean;
   coverage_id?: string | null;
   analysts: ReportAnalystInput[];
   changed_by: string;
-  word_file_path?: string | null;
-  word_file_name?: string | null;
-  pdf_file_path?: string | null;
-  pdf_file_name?: string | null;
-  model_file_path?: string | null;
-  model_file_name?: string | null;
+  word_path?: string | null;
+  pdf_path?: string | null;
+  model_path?: string | null;
 }): Promise<Result<ReportDetail>> {
   return saveReportContent({
     report_id: params.report_id,
@@ -121,17 +99,13 @@ export async function saveReviewReportContent(params: {
     region_code: params.region_code,
     sector_id: params.sector_id,
     report_language: params.report_language,
-    contact_person_id: params.contact_person_id,
+    contact_person: params.contact_person,
     investment_thesis: params.investment_thesis,
-    certificate_confirmed: params.certificate_confirmed,
     coverage_id: params.coverage_id,
     analysts: params.analysts,
     changed_by: params.changed_by,
-    word_file_path: params.word_file_path,
-    word_file_name: params.word_file_name,
-    pdf_file_path: params.pdf_file_path,
-    pdf_file_name: params.pdf_file_name,
-    model_file_path: params.model_file_path,
-    model_file_name: params.model_file_name,
+    word_path: params.word_path,
+    pdf_path: params.pdf_path,
+    model_path: params.model_path,
   });
 }

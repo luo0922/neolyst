@@ -1,0 +1,1 @@
+CREATE INDEX "oauth_clients_deleted_at_idx" ON "auth"."oauth_clients" (deleted_at);

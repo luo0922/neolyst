@@ -1,0 +1,2 @@
+ALTER TABLE "storage"."s3_multipart_uploads" ADD CONSTRAINT "s3_multipart_uploads_bucket_id_fkey" FOREIGN KEY (bucket_id) REFERENCES storage.buckets(id);
+CREATE INDEX "idx_multipart_uploads_list" ON "storage"."s3_multipart_uploads" (bucket_id, key, created_at);

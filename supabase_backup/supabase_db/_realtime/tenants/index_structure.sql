@@ -1,0 +1,1 @@
+CREATE INDEX "tenants_external_id_index" ON "_realtime"."tenants" (external_id);

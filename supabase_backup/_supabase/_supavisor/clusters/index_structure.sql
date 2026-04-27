@@ -1,0 +1,1 @@
+CREATE INDEX "clusters_alias_index" ON "_supavisor"."clusters" (alias);

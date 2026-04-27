@@ -1,8 +1,11 @@
 "use client";
 
-import { Editor } from "@tinymce/tinymce-react";
 import * as React from "react";
+import { useEditor, EditorContent } from "@tiptap/react";
+import StarterKit from "@tiptap/starter-kit";
+import Placeholder from "@tiptap/extension-placeholder";
 import { cn } from "@/lib/utils";
+import "./rich-text-editor.css";
 
 export interface RichTextEditorProps {
   label?: string;
@@ -17,10 +20,205 @@ export function RichTextEditor({
   label,
   value,
   onChange,
-  placeholder = "",
+  placeholder = "Enter content...",
   className = "",
-  minHeight = "500px",
+  minHeight = "150px",
 }: RichTextEditorProps) {
+  const editor = useEditor({
+    immediatelyRender: false,
+    extensions: [
+      StarterKit.configure({
+        heading: {
+          levels: [1, 2, 3],
+        },
+        bulletList: {
+          keepMarks: true,
+          keepAttributes: false,
+        },
+        orderedList: {
+          keepMarks: true,
+          keepAttributes: false,
+        },
+      }),
+      Placeholder.configure({
+        placeholder,
+      }),
+    ],
+    content: value,
+    onUpdate: ({ editor }) => {
+      onChange(editor.getHTML());
+    },
+    editorProps: {
+      attributes: {
+        class: cn(
+          "prose prose-invert prose-sm max-w-none focus:outline-none",
+          "min-h-[150px] px-3 py-2 text-zinc-100",
+        ),
+        style: "font-family: KaiTi, 'STKaiti', '楷体', '楷体GB_2312', Calibri, sans-serif;",
+      },
+    },
+  });
+
+  // Update editor content when value changes from outside
+  React.useEffect(() => {
+    if (editor && editor.getHTML() !== value) {
+      editor.commands.setContent(value, { emitUpdate: false });
+    }
+  }, [value, editor]);
+
+  if (!editor) {
+    return (
+      <div className={cn("space-y-1.5", className)}>
+        {label && (
+          <label className="block text-sm font-medium text-zinc-300">
+            {label}
+          </label>
+        )}
+        <div
+          className="w-full rounded-[8px] border border-white/10 bg-zinc-900 px-3 py-2"
+          style={{ minHeight }}
+        />
+      </div>
+    );
+  }
+
+  const MenuBar = () => {
+    return (
+      <div className="flex flex-wrap gap-1 rounded-t-[8px] border border-white/10 border-b-0 bg-zinc-800/50 px-2 py-1.5">
+        {/* Text Style */}
+        <div className="flex gap-1 border-r border-white/10 pr-2">
+          <button
+            type="button"
+            onClick={() => editor.chain().focus().toggleBold().run()}
+            className={cn(
+              "rounded px-2 py-1 text-xs font-medium transition-colors",
+              editor.isActive("bold")
+                ? "bg-blue-600 text-white"
+                : "text-zinc-400 hover:bg-zinc-700 hover:text-zinc-100",
+            )}
+          >
+            <strong>B</strong>
+          </button>
+          <button
+            type="button"
+            onClick={() => editor.chain().focus().toggleItalic().run()}
+            className={cn(
+              "rounded px-2 py-1 text-xs italic transition-colors",
+              editor.isActive("italic")
+                ? "bg-blue-600 text-white"
+                : "text-zinc-400 hover:bg-zinc-700 hover:text-zinc-100",
+            )}
+          >
+            <em>I</em>
+          </button>
+          <button
+            type="button"
+            onClick={() => editor.chain().focus().toggleStrike().run()}
+            className={cn(
+              "rounded px-2 py-1 text-xs line-through transition-colors",
+              editor.isActive("strike")
+                ? "bg-blue-600 text-white"
+                : "text-zinc-400 hover:bg-zinc-700 hover:text-zinc-100",
+            )}
+          >
+            S
+          </button>
+        </div>
+
+        {/* Headings */}
+        <div className="flex gap-1 border-r border-white/10 pr-2">
+          <button
+            type="button"
+            onClick={() => editor.chain().focus().toggleHeading({ level: 1 }).run()}
+            className={cn(
+              "rounded px-2 py-1 text-xs font-bold transition-colors",
+              editor.isActive("heading", { level: 1 })
+                ? "bg-blue-600 text-white"
+                : "text-zinc-400 hover:bg-zinc-700 hover:text-zinc-100",
+            )}
+          >
+            H1
+          </button>
+          <button
+            type="button"
+            onClick={() => editor.chain().focus().toggleHeading({ level: 2 }).run()}
+            className={cn(
+              "rounded px-2 py-1 text-xs font-bold transition-colors",
+              editor.isActive("heading", { level: 2 })
+                ? "bg-blue-600 text-white"
+                : "text-zinc-400 hover:bg-zinc-700 hover:text-zinc-100",
+            )}
+          >
+            H2
+          </button>
+          <button
+            type="button"
+            onClick={() => editor.chain().focus().toggleHeading({ level: 3 }).run()}
+            className={cn(
+              "rounded px-2 py-1 text-xs font-bold transition-colors",
+              editor.isActive("heading", { level: 3 })
+                ? "bg-blue-600 text-white"
+                : "text-zinc-400 hover:bg-zinc-700 hover:text-zinc-100",
+            )}
+          >
+            H3
+          </button>
+        </div>
+
+        {/* Lists */}
+        <div className="flex gap-1 border-r border-white/10 pr-2">
+          <button
+            type="button"
+            onClick={() => editor.chain().focus().toggleBulletList().run()}
+            className={cn(
+              "rounded px-2 py-1 text-xs transition-colors",
+              editor.isActive("bulletList")
+                ? "bg-blue-600 text-white"
+                : "text-zinc-400 hover:bg-zinc-700 hover:text-zinc-100",
+            )}
+          >
+            • List
+          </button>
+          <button
+            type="button"
+            onClick={() => editor.chain().focus().toggleOrderedList().run()}
+            className={cn(
+              "rounded px-2 py-1 text-xs transition-colors",
+              editor.isActive("orderedList")
+                ? "bg-blue-600 text-white"
+                : "text-zinc-400 hover:bg-zinc-700 hover:text-zinc-100",
+            )}
+          >
+            1. List
+          </button>
+        </div>
+
+        {/* Alignment & Cleanup */}
+        <div className="flex gap-1">
+          <button
+            type="button"
+            onClick={() => editor.chain().focus().setParagraph().run()}
+            className={cn(
+              "rounded px-2 py-1 text-xs transition-colors",
+              editor.isActive("paragraph")
+                ? "bg-blue-600 text-white"
+                : "text-zinc-400 hover:bg-zinc-700 hover:text-zinc-100",
+            )}
+          >
+            ¶
+          </button>
+          <button
+            type="button"
+            onClick={() => editor.chain().focus().unsetAllMarks().run()}
+            className="rounded px-2 py-1 text-xs text-zinc-400 transition-colors hover:bg-zinc-700 hover:text-zinc-100"
+          >
+            Clear
+          </button>
+        </div>
+      </div>
+    );
+  };
+
   return (
     <div className={cn("space-y-1.5", className)}>
       {label && (
@@ -29,66 +227,10 @@ export function RichTextEditor({
         </label>
       )}
       <div
-        className="rounded-[8px] border border-white/10 bg-zinc-900/70 overflow-hidden focus-within:ring-2 focus-within:ring-blue-500/60 focus-within:border-blue-500/60"
+        className="RichTextEditor rounded-[8px] border border-white/10 bg-zinc-900/70 focus-within:ring-2 focus-within:ring-blue-500/60 focus-within:border-blue-500/60"
       >
-        <Editor
-          tinymceScriptSrc="/tinymce/tinymce.min.js"
-          init={{
-            base_url: "/tinymce",
-            suffix: ".min",
-            height: 500,
-            min_height: 500,
-            menubar: false,
-            placeholder,
-            font_formats:
-              "楷体=KaiTi,'STKaiti','楷体','楷体GB_2312',Calibri,sans-serif;"
-              + "宋体=SimSun,'宋体',serif;"
-              + "黑体=SimHei,'黑体',sans-serif;"
-              + "Times New Roman=Times New Roman,serif;"
-              + "Consolas=Consolas,monospace;",
-            content_style: `
-              body {
-                font-family: Calibri, '楷体GB2312', 'KaiTi', '楷体', 'STKaiti', sans-serif;
-                text-align: justify;
-                color: #000000;
-                background: transparent;
-                font-size: 16px;
-                line-height: 1.6;
-                padding: 8px 12px;
-              }
-              h1, h2, h3 { font-weight: bold; margin-top: 0.5em; margin-bottom: 0.25em; }
-              h1 { font-size: 1.5em; }
-              h2 { font-size: 1.25em; }
-              h3 { font-size: 1.1em; }
-              p { margin: 0 0 0.5em 0; }
-              ul, ol { padding-left: 1.5em; margin: 0 0 0.5em 0; }
-              strong, b { font-weight: bold; }
-              em, i { font-style: italic; }
-            `,
-            toolbar:
-              "formats | bold italic strikethrough | bullist numlist | removeformat",
-            formats: {
-              h1: { block: "h1", styles: { fontWeight: "bold" } },
-              h2: { block: "h2", styles: { fontWeight: "bold" } },
-              h3: { block: "h3", styles: { fontWeight: "bold" } },
-            },
-            browser_spellcheck: true,
-            branding: false,
-            resize: true,
-            skin: "oxide-dark",
-            content_css: "dark",
-            setup: (editor) => {
-              editor.on("init", () => {
-                if (value) {
-                  editor.setContent(value, { format: "html" });
-                }
-              });
-            },
-          }}
-          initialValue={value}
-          onEditorChange={onChange}
-          id="investment-thesis-editor"
-        />
+        <MenuBar />
+        <EditorContent editor={editor} />
       </div>
     </div>
   );

@@ -1,0 +1,1 @@
+ALTER TABLE "storage"."buckets" ADD CONSTRAINT "buckets_pkey" PRIMARY KEY (id);

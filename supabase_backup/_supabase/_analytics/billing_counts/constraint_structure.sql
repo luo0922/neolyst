@@ -1,0 +1,1 @@
+ALTER TABLE "_analytics"."billing_counts" ADD CONSTRAINT "billing_counts_pkey" PRIMARY KEY (id);

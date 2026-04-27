@@ -1,0 +1,2 @@
+ALTER TABLE "kong"."clustering_sync_delta" ADD CONSTRAINT "clustering_sync_delta_version_fkey" FOREIGN KEY (version) REFERENCES kong.clustering_sync_version(version) ON DELETE CASCADE;
+CREATE INDEX "clustering_sync_delta_version_idx" ON "kong"."clustering_sync_delta" (version);

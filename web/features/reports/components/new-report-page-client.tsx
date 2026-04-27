@@ -24,7 +24,6 @@ import type { SectorWithChildren } from "@/features/sectors/repo/sectors-repo";
 import {
   createReportAction,
   directSubmitReportAction,
-  saveChiefApproveAction,
   saveReportContentAction,
   uploadReportFileAction,
 } from "@/features/reports/actions";
@@ -34,23 +33,10 @@ import {
   validatePdfExtension,
 } from "@/features/reports/file-utils";
 import type { ReportDetail } from "@/features/reports/repo/reports-repo";
-import type { UserRow } from "@/domain/user";
-
-type FormAnalyst = ReportAnalystInput;
-
 const LANGUAGE_OPTIONS: { value: ReportLanguage; label: string }[] = [
   { value: "en", label: "English" },
   { value: "zh", label: "Chinese" },
 ];
-
-const CERTIFICATE_CLAUSES = [
-  "members of my household and I have not traded any financial interest in the subject company since I started the coverage nor currently hold any financial interest in the subject company (including, without limitation, any securities, option, right, warrant, future, long or short position;",
-  "I did not receive any compensation from the subject company in the previous 12 months;",
-  "I have not served as an officer, director or employee of the subject company;",
-  "none of my household serve as an officer of the subject company;",
-  "I comply with the Group Compliance Policy with regards to gifts and entertainment in dealing with subject companies and investors;",
-  "this research report contains no material non-public information.",
-] as const;
 
 function formatReportTypeLabel(value: string): string {
   return value
@@ -87,7 +73,6 @@ export interface NewReportPageClientProps {
   sectors: SectorWithChildren[];
   coverages: CoverageWithDetails[];
   ratings: Rating[];
-  users: UserRow[];
 }
 
 export function NewReportPageClient({
@@ -98,7 +83,6 @@ export function NewReportPageClient({
   sectors,
   coverages,
   ratings,
-  users,
 }: NewReportPageClientProps) {
   const router = useRouter();
   const toast = useToast();
@@ -137,10 +121,11 @@ export function NewReportPageClient({
   const [formRegionCode, setFormRegionCode] = React.useState("");
   const [formSectorId, setFormSectorId] = React.useState("");
   const [formLanguage, setFormLanguage] = React.useState<ReportLanguage>("en");
-  const [formContactPersonId, setFormContactPersonId] = React.useState("");
+  const [formContactPerson, setFormContactPerson] = React.useState("");
   const [formInvestmentThesis, setFormInvestmentThesis] = React.useState("");
-  const [formCertificate, setFormCertificate] = React.useState(false);
-  const [formAnalysts, setFormAnalysts] = React.useState<FormAnalyst[]>([]);
+  const [formAnalysts, setFormAnalysts] = React.useState<ReportAnalystInput[]>(
+    [],
+  );
   const [formErrors, setFormErrors] = React.useState<Record<string, string>>(
     {},
   );
@@ -148,7 +133,6 @@ export function NewReportPageClient({
   const [reportFile, setReportFile] = React.useState<File | null>(null);
   const [pdfFile, setPdfFile] = React.useState<File | null>(null);
   const [modelFile, setModelFile] = React.useState<File | null>(null);
-  const [chiefApprovalScreenshotFile, setChiefApprovalScreenshotFile] = React.useState<File | null>(null);
 
   React.useEffect(() => {
     if (!reportTypes.includes(formReportType) && reportTypes.length > 0) {
@@ -162,16 +146,19 @@ export function NewReportPageClient({
     const selectedOthers = new Set(
       formAnalysts
         .filter((_, idx) => idx !== index)
-        .map((item) => item.analyst_id)
+        .map((item) => item.analyst_email)
         .filter(Boolean),
     );
-    const current = formAnalysts[index]?.analyst_id;
+    const current = formAnalysts[index]?.analyst_email;
 
     return [
       { value: "", label: "Select analyst..." },
       ...analysts
-        .filter((item) => item.id === current || !selectedOthers.has(item.id))
-        .map((item) => ({ value: item.id, label: item.full_name })),
+        .filter((item) => item.email === current || !selectedOthers.has(item.email))
+        .map((item) => ({
+          value: item.email,
+          label: `${item.english_name ?? item.email} (${item.email})`,
+        })),
     ];
   }
 
@@ -181,7 +168,7 @@ export function NewReportPageClient({
     }
     setFormAnalysts((prev) => [
       ...prev,
-      { analyst_id: "", role: prev.length + 1, sort_order: prev.length + 1 },
+      { analyst_email: "", author_order: prev.length + 1 },
     ]);
   }
 
@@ -189,29 +176,28 @@ export function NewReportPageClient({
     setFormAnalysts((prev) =>
       prev
         .filter((_, idx) => idx !== index)
-        .map((item, idx) => ({ ...item, role: idx + 1, sort_order: idx + 1 })),
+        .map((item, idx) => ({ ...item, author_order: idx + 1 })),
     );
   }
 
-  function updateAnalyst(index: number, analystId: string) {
+  function updateAnalyst(index: number, analystEmail: string) {
     setFormAnalysts((prev) => {
       const next = [...prev];
-      next[index] = { ...next[index], analyst_id: analystId };
+      next[index] = { ...next[index], analyst_email: analystEmail };
       return next;
     });
   }
 
-  function buildValidatedAnalysts(): FormAnalyst[] {
+  function buildValidatedAnalysts(): ReportAnalystInput[] {
     return formAnalysts
-      .filter((item) => item.analyst_id)
+      .filter((item) => item.analyst_email)
       .map((item, index) => ({
-        analyst_id: item.analyst_id,
-        role: index + 1,
-        sort_order: index + 1,
+        analyst_email: item.analyst_email,
+        author_order: index + 1,
       }));
   }
 
-  function validateForm(): FormAnalyst[] | null {
+  function validateForm(): ReportAnalystInput[] | null {
     const errors: Record<string, string> = {};
 
     if (!formTitle.trim()) {
@@ -223,7 +209,9 @@ export function NewReportPageClient({
     }
 
     const validatedAnalysts = buildValidatedAnalysts();
-    const unique = new Set(validatedAnalysts.map((item) => item.analyst_id));
+    const unique = new Set(
+      validatedAnalysts.map((item) => item.analyst_email.toLowerCase()),
+    );
     if (unique.size !== validatedAnalysts.length) {
       errors.analysts = "Analysts must be unique";
     }
@@ -236,7 +224,7 @@ export function NewReportPageClient({
   }
 
   async function ensureReportId(
-    analystsValue: FormAnalyst[],
+    analystsValue: ReportAnalystInput[],
   ): Promise<ReportDetail | null> {
     if (activeReport) {
       return activeReport;
@@ -251,9 +239,8 @@ export function NewReportPageClient({
       region_code: formRegionCode || null,
       sector_id: formSectorId || null,
       report_language: formLanguage,
-      contact_person_id: formContactPersonId || null,
+      contact_person: formContactPerson || null,
       investment_thesis: formInvestmentThesis || null,
-      certificate_confirmed: formCertificate,
       analysts: analystsValue,
     });
 
@@ -266,38 +253,25 @@ export function NewReportPageClient({
     return createResult.data;
   }
 
-  async function uploadReportFiles(params: {
-    reportId: string;
-    versionNo: number;
-  }): Promise<
+  async function uploadReportFiles(): Promise<
     | {
         ok: true;
         data: {
-          word_file_path: string | null;
-          word_file_name: string | null;
-          pdf_file_path: string | null;
-          pdf_file_name: string | null;
-          model_file_path: string | null;
-          model_file_name: string | null;
+          word_path: string | null;
+          pdf_path: string | null;
+          model_path: string | null;
         };
       }
-    | {
-        ok: false;
-        error: string;
-      }
+    | { ok: false; error: string }
   > {
-    let wordFilePath: string | null =
-      activeReport?.latest_version?.word_file_path ?? null;
-    let wordFileName: string | null =
-      activeReport?.latest_version?.word_file_name ?? null;
-    let pdfFilePath: string | null =
-      activeReport?.latest_version?.pdf_file_path ?? null;
-    let pdfFileName: string | null =
-      activeReport?.latest_version?.pdf_file_name ?? null;
-    let modelFilePath: string | null =
-      activeReport?.latest_version?.model_file_path ?? null;
-    let modelFileName: string | null =
-      activeReport?.latest_version?.model_file_name ?? null;
+    const reportId = activeReport?.id;
+    if (!reportId) {
+      return { ok: false, error: "No active report" };
+    }
+
+    let wordPath: string | null = activeReport?.word_path ?? null;
+    let pdfPath: string | null = activeReport?.pdf_path ?? null;
+    let modelPath: string | null = activeReport?.model_path ?? null;
 
     // Upload Word/PPT file
     if (reportFile) {
@@ -308,16 +282,14 @@ export function NewReportPageClient({
 
       const fd = new FormData();
       fd.append("file", reportFile);
-      fd.append("reportId", params.reportId);
-      fd.append("versionNo", String(params.versionNo));
+      fd.append("reportId", reportId);
       fd.append("label", "report");
 
       const result = await uploadReportFileAction(fd);
       if (!result.ok) {
         return { ok: false, error: result.error };
       }
-      wordFilePath = result.file_path;
-      wordFileName = reportFile.name;
+      wordPath = result.file_path;
     }
 
     // Upload PDF file
@@ -329,16 +301,14 @@ export function NewReportPageClient({
 
       const fd = new FormData();
       fd.append("file", pdfFile);
-      fd.append("reportId", params.reportId);
-      fd.append("versionNo", String(params.versionNo));
+      fd.append("reportId", reportId);
       fd.append("label", "report-pdf");
 
       const result = await uploadReportFileAction(fd);
       if (!result.ok) {
         return { ok: false, error: result.error };
       }
-      pdfFilePath = result.file_path;
-      pdfFileName = pdfFile.name;
+      pdfPath = result.file_path;
     }
 
     // Upload Model file
@@ -350,69 +320,24 @@ export function NewReportPageClient({
 
       const fd = new FormData();
       fd.append("file", modelFile);
-      fd.append("reportId", params.reportId);
-      fd.append("versionNo", String(params.versionNo));
+      fd.append("reportId", reportId);
       fd.append("label", "model");
 
       const result = await uploadReportFileAction(fd);
       if (!result.ok) {
         return { ok: false, error: result.error };
       }
-      modelFilePath = result.file_path;
-      modelFileName = modelFile.name;
+      modelPath = result.file_path;
     }
 
     return {
       ok: true,
       data: {
-        word_file_path: wordFilePath,
-        word_file_name: wordFileName,
-        pdf_file_path: pdfFilePath,
-        pdf_file_name: pdfFileName,
-        model_file_path: modelFilePath,
-        model_file_name: modelFileName,
+        word_path: wordPath,
+        pdf_path: pdfPath,
+        model_path: modelPath,
       },
     };
-  }
-
-  async function uploadChiefApprovalScreenshot(params: {
-    reportId: string;
-  }): Promise<{ ok: boolean; error?: string }> {
-    if (!chiefApprovalScreenshotFile) {
-      return { ok: true };
-    }
-
-    const allowedExtensions = [".jpg", ".jpeg", ".png", ".gif", ".webp"];
-    const fileName = chiefApprovalScreenshotFile.name.toLowerCase();
-    const ext = fileName.match(/\.[^.]+$/)?.[0] ?? "";
-
-    if (!allowedExtensions.includes(ext)) {
-      return { ok: false, error: "Chief approval screenshot must be an image (jpg, png, gif, webp)" };
-    }
-
-    const fd = new FormData();
-    fd.append("file", chiefApprovalScreenshotFile);
-    fd.append("reportId", params.reportId);
-    fd.append("label", "chief-approval");
-
-    const result = await uploadReportFileAction(fd);
-    if (!result.ok) {
-      return { ok: false, error: result.error };
-    }
-
-    // Save to chief_approve table
-    const saveResult = await saveChiefApproveAction({
-      report_id: params.reportId,
-      file_path: result.file_path,
-      file_name: chiefApprovalScreenshotFile.name,
-      file_type: chiefApprovalScreenshotFile.type,
-    });
-
-    if (!saveResult.ok) {
-      return { ok: false, error: saveResult.error };
-    }
-
-    return { ok: true };
   }
 
   async function handleSaveDraft() {
@@ -433,22 +358,7 @@ export function NewReportPageClient({
         return;
       }
 
-      // Upload chief approval screenshot first (if any)
-      if (chiefApprovalScreenshotFile) {
-        const chiefUploadResult = await uploadChiefApprovalScreenshot({
-          reportId: ensuredReport.id,
-        });
-        if (!chiefUploadResult.ok) {
-          toast.error(chiefUploadResult.error ?? "Upload failed", { title: "Error" });
-          setSaving(false);
-          return;
-        }
-      }
-
-      const uploadResult = await uploadReportFiles({
-        reportId: ensuredReport.id,
-        versionNo: ensuredReport.current_version_no + 1,
-      });
+      const uploadResult = await uploadReportFiles();
       if (!uploadResult.ok) {
         toast.error(uploadResult.error, { title: "Error" });
         return;
@@ -464,16 +374,12 @@ export function NewReportPageClient({
         region_code: formRegionCode || null,
         sector_id: formSectorId || null,
         report_language: formLanguage,
-        contact_person_id: formContactPersonId || null,
+        contact_person: formContactPerson || null,
         investment_thesis: formInvestmentThesis || null,
-        certificate_confirmed: formCertificate,
         analysts: analystsValue,
-        word_file_path: uploadResult.data.word_file_path,
-        word_file_name: uploadResult.data.word_file_name,
-        pdf_file_path: uploadResult.data.pdf_file_path,
-        pdf_file_name: uploadResult.data.pdf_file_name,
-        model_file_path: uploadResult.data.model_file_path,
-        model_file_name: uploadResult.data.model_file_name,
+        word_path: uploadResult.data.word_path,
+        pdf_path: uploadResult.data.pdf_path,
+        model_path: uploadResult.data.model_path,
       });
 
       if (!saveResult.ok) {
@@ -485,7 +391,6 @@ export function NewReportPageClient({
       setReportFile(null);
       setPdfFile(null);
       setModelFile(null);
-      setChiefApprovalScreenshotFile(null);
       toast.success("Draft saved.", { title: "Success" });
       router.refresh();
     } finally {
@@ -504,14 +409,6 @@ export function NewReportPageClient({
       return;
     }
 
-    if (!formCertificate) {
-      setFormErrors((prev) => ({
-        ...prev,
-        certificate_confirmed: "Certificate must be confirmed before submit",
-      }));
-      return;
-    }
-
     setSaving(true);
     try {
       const ensuredReport = await ensureReportId(analystsValue);
@@ -519,22 +416,7 @@ export function NewReportPageClient({
         return;
       }
 
-      // Upload chief approval screenshot first (if any)
-      if (chiefApprovalScreenshotFile) {
-        const chiefUploadResult = await uploadChiefApprovalScreenshot({
-          reportId: ensuredReport.id,
-        });
-        if (!chiefUploadResult.ok) {
-          toast.error(chiefUploadResult.error ?? "Upload failed", { title: "Error" });
-          setSaving(false);
-          return;
-        }
-      }
-
-      const uploadResult = await uploadReportFiles({
-        reportId: ensuredReport.id,
-        versionNo: ensuredReport.current_version_no + 1,
-      });
+      const uploadResult = await uploadReportFiles();
       if (!uploadResult.ok) {
         toast.error(uploadResult.error, { title: "Error" });
         return;
@@ -550,16 +432,12 @@ export function NewReportPageClient({
         region_code: formRegionCode || null,
         sector_id: formSectorId || null,
         report_language: formLanguage,
-        contact_person_id: formContactPersonId || null,
+        contact_person: formContactPerson || null,
         investment_thesis: formInvestmentThesis || null,
-        certificate_confirmed: formCertificate,
         analysts: analystsValue,
-        word_file_path: uploadResult.data.word_file_path,
-        word_file_name: uploadResult.data.word_file_name,
-        pdf_file_path: uploadResult.data.pdf_file_path,
-        pdf_file_name: uploadResult.data.pdf_file_name,
-        model_file_path: uploadResult.data.model_file_path,
-        model_file_name: uploadResult.data.model_file_name,
+        word_path: uploadResult.data.word_path,
+        pdf_path: uploadResult.data.pdf_path,
+        model_path: uploadResult.data.model_path,
       });
 
       if (!directResult.ok) {
@@ -571,7 +449,6 @@ export function NewReportPageClient({
       setReportFile(null);
       setPdfFile(null);
       setModelFile(null);
-      setChiefApprovalScreenshotFile(null);
       toast.success("Report submitted.", { title: "Success" });
       router.push("/reports");
       router.refresh();
@@ -590,8 +467,7 @@ export function NewReportPageClient({
             </div>
             {activeReport ? (
               <div className="text-xs text-[var(--fg-secondary)]">
-                Draft ID: {activeReport.id.slice(0, 8)}... / v
-                {activeReport.current_version_no}
+                Draft ID: {activeReport.id.slice(0, 8)}...
               </div>
             ) : null}
           </div>
@@ -637,9 +513,11 @@ export function NewReportPageClient({
                 ...coverages
                   .filter((c) => c.analysts.length > 0)
                   .map((c) => {
-                    const firstAnalyst = [...c.analysts]
-                      .sort((a, b) => a.sort_order - b.sort_order)[0];
-                    const analystName = firstAnalyst?.analyst?.full_name || "Unknown";
+                    const firstAnalyst = [...c.analysts].sort(
+                      (a, b) => a.author_order - b.author_order,
+                    )[0];
+                    const analystName =
+                      firstAnalyst?.analyst?.english_name ?? "Unknown";
                     return {
                       value: c.ticker,
                       label: `${c.ticker} - ${analystName}`,
@@ -668,8 +546,7 @@ export function NewReportPageClient({
                 value={formTargetPrice}
                 onChange={(event) => {
                   const value = event.target.value;
-                  // 只允许数字和小数点
-                  if (value === '' || /^\d*\.?\d*$/.test(value)) {
+                  if (value === "" || /^\d*\.?\d*$/.test(value)) {
                     setFormTargetPrice(value);
                   }
                 }}
@@ -724,22 +601,24 @@ export function NewReportPageClient({
 
           <div className="space-y-2 rounded-[8px] border border-[var(--border-subtle)] bg-[var(--bg-surface-hover)]/40 p-4">
             <div className="flex items-center justify-between">
-              <div className="text-sm font-medium text-[var(--fg-primary)]">Analyst</div>
+              <div className="text-sm font-medium text-[var(--fg-primary)]">
+                Analyst
+              </div>
               <Button type="button" variant="ghost" onClick={addAnalyst}>
                 Add Analyst
               </Button>
             </div>
             {formAnalysts.length === 0 ? (
-              <p className="text-sm text-[var(--fg-primary)]0">No analyst assigned.</p>
+              <p className="text-sm text-[var(--fg-primary)]">No analyst assigned.</p>
             ) : (
               formAnalysts.map((item, index) => (
                 <div
-                  key={`${item.analyst_id}-${index}`}
+                  key={`${item.analyst_email}-${index}`}
                   className="grid grid-cols-12 gap-2"
                 >
                   <div className="col-span-9">
                     <Select
-                      value={item.analyst_id}
+                      value={item.analyst_email}
                       onChange={(event) =>
                         updateAnalyst(index, event.target.value)
                       }
@@ -769,14 +648,14 @@ export function NewReportPageClient({
 
           <SearchableSelect
             label="Contact Person"
-            value={formContactPersonId}
-            onChange={setFormContactPersonId}
-            placeholder="Search user..."
+            value={formContactPerson}
+            onChange={setFormContactPerson}
+            placeholder="Search analyst..."
             options={[
               { value: "", label: "Select contact person..." },
-              ...users.map((user) => ({
-                value: user.id,
-                label: user.fullName || user.email,
+              ...analysts.map((a) => ({
+                value: a.email,
+                label: `${a.english_name ?? a.email} (${a.email})`,
               })),
             ]}
           />
@@ -787,41 +666,6 @@ export function NewReportPageClient({
             onChange={setFormInvestmentThesis}
             minHeight="150px"
           />
-
-          <div className="space-y-2 rounded-[8px] border border-[var(--border-subtle)] bg-[var(--bg-surface-hover)]/30 p-4">
-            <div className="text-sm font-medium text-[var(--fg-primary)]">
-              * certificate
-            </div>
-            <label className="flex items-start gap-2 text-sm text-[var(--fg-primary)]">
-              <input
-                type="checkbox"
-                className="mt-1 h-4 w-4 rounded border-[var(--border-default)] bg-[var(--bg-surface)]"
-                checked={formCertificate}
-                onChange={(event) => {
-                  setFormCertificate(event.target.checked);
-                  setFormErrors((prev) => {
-                    const next = { ...prev };
-                    delete next.certificate_confirmed;
-                    return next;
-                  });
-                }}
-              />
-              <span>
-                I and all the names listed as the authors of this uploaded
-                notes, certify that'
-              </span>
-            </label>
-            <ol className="list-decimal space-y-1 pl-6 text-sm text-[var(--fg-secondary)]">
-              {CERTIFICATE_CLAUSES.map((item) => (
-                <li key={item}>{item}</li>
-              ))}
-            </ol>
-            {formErrors.certificate_confirmed ? (
-              <p className="text-xs text-red-500">
-                {formErrors.certificate_confirmed}
-              </p>
-            ) : null}
-          </div>
         </section>
 
         <section className="space-y-4 rounded-[12px] border border-[var(--border-subtle)] bg-[var(--bg-surface)]/70 p-5">
@@ -853,13 +697,6 @@ export function NewReportPageClient({
                 : "Optional for non-Company reports"
             }
           />
-          <FileDropzone
-            label="Chief Approval Screenshot"
-            accept=".jpg,.jpeg,.png,.gif,.webp"
-            file={chiefApprovalScreenshotFile}
-            onFileChange={setChiefApprovalScreenshotFile}
-            hint="Required for Submit (jpg, png, gif, webp)"
-          />
         </section>
 
         <div className="flex justify-end gap-3">
@@ -871,7 +708,11 @@ export function NewReportPageClient({
           >
             Save Draft
           </Button>
-          <Button type="button" onClick={handleDirectSubmit} isLoading={saving}>
+          <Button
+            type="button"
+            onClick={handleDirectSubmit}
+            isLoading={saving}
+          >
             Direct Submit
           </Button>
         </div>

@@ -1,0 +1,2 @@
+ALTER TABLE "storage"."prefixes" ADD CONSTRAINT "prefixes_bucketId_fkey" FOREIGN KEY (bucket_id) REFERENCES storage.buckets(id);
+CREATE INDEX "idx_prefixes_lower_name" ON "storage"."prefixes" (bucket_id, level, string_to_array, lower);

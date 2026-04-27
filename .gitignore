@@ -79,3 +79,6 @@ next-env.d.ts
 # 操作系统
 Thumbs.db
 .claude/settings.local.json
+
+# 服务器配置（包含敏感凭证）
+docs/SERVERS.md

@@ -1,0 +1,2 @@
+ALTER TABLE "_analytics"."saved_searches" ADD CONSTRAINT "saved_searches_source_id_fkey" FOREIGN KEY (source_id) REFERENCES _analytics.sources(id) ON DELETE CASCADE;
+CREATE INDEX "saved_searches_querystring_source_id_index" ON "_analytics"."saved_searches" (querystring, source_id);

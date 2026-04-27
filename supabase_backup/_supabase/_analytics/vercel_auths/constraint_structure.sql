@@ -1,0 +1,1 @@
+ALTER TABLE "_analytics"."vercel_auths" ADD CONSTRAINT "vercel_auths_pkey" PRIMARY KEY (id);

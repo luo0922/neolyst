@@ -1,0 +1,1 @@
+ALTER TABLE "mem0"."memories" ADD CONSTRAINT "memories_pkey" PRIMARY KEY (id);

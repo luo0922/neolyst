@@ -1,0 +1,1 @@
+ALTER TABLE "_supavisor"."clusters" ADD CONSTRAINT "clusters_pkey" PRIMARY KEY (id);

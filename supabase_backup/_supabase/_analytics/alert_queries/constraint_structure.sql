@@ -1,0 +1,1 @@
+ALTER TABLE "_analytics"."alert_queries" ADD CONSTRAINT "alert_queries_pkey" PRIMARY KEY (id);

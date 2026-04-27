@@ -1,0 +1,2 @@
+INSERT INTO "_supavisor"."users" ("id", "db_user_alias", "db_user", "db_pass_encrypted", "pool_size", "mode_type", "is_manager", "tenant_external_id", "inserted_at", "updated_at", "pool_checkout_timeout", "max_clients") VALUES 
+('0616633d-2e9c-4245-97b3-df8a051ea2e4', 'pgbouncer', 'pgbouncer', '\x010a4145532e47434d2e5631bc59913f7434893b9693c19f96a7d6fb3d98781b8a45dff6c7634fc14e859cc6521fee56be3e22ad', '20', 'transaction', true, 'tenant-id', '2026-03-18 08:46:53', '2026-03-18 08:46:53', '60000', null);

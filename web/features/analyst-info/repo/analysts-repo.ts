@@ -6,14 +6,14 @@ import { createServerClient } from "@/lib/supabase/server";
 
 export type { PaginatedList };
 
+// New schema: PK is email (text), not uuid id. full_name renamed to english_name.
 export type Analyst = {
-  id: string;
-  full_name: string;
+  // id field removed - email is the PK
+  english_name: string;
   chinese_name: string | null;
   email: string;
   region_code: string | null;
   region: {
-    id: string;
     name_en: string;
     name_cn: string;
     code: string;
@@ -29,7 +29,8 @@ export type Analyst = {
 const PAGE_SIZE = 15;
 
 /**
- * List analysts with pagination and search
+ * List analysts with pagination and search.
+ * No FK on analyst.region_code — region join done in JS.
  */
 export async function listAnalysts(params: {
   page: number;
@@ -39,23 +40,21 @@ export async function listAnalysts(params: {
 
   let query = supabase
     .from("analyst")
-    .select("*, region(id, name_en, name_cn, code, is_active)", { count: "exact" });
+    .select("*", { count: "exact" });
 
-  // Apply search filter
   if (params.query) {
     const searchTerm = `%${params.query}%`;
     query = query.or(
-      `full_name.ilike.${searchTerm},chinese_name.ilike.${searchTerm},email.ilike.${searchTerm}`,
+      `english_name.ilike.${searchTerm},chinese_name.ilike.${searchTerm},email.ilike.${searchTerm}`,
     );
   }
 
-  // Apply pagination
   const from = (params.page - 1) * PAGE_SIZE;
   const to = from + PAGE_SIZE - 1;
 
-  query = query.order("created_at", { ascending: false }).range(from, to);
-
-  const { data, error, count } = await query;
+  const { data, error, count } = await query
+    .order("created_at", { ascending: false })
+    .range(from, to);
 
   if (error) return err(error.message);
   if (!data) return err("Failed to fetch analysts");
@@ -63,19 +62,32 @@ export async function listAnalysts(params: {
   const total = count ?? 0;
   const totalPages = Math.ceil(total / PAGE_SIZE);
 
-  return ok({
-    items: data as Analyst[],
-    total,
-    page: params.page,
-    totalPages,
-  });
+  // JS-side region join
+  const regionCodes = [
+    ...new Set((data as Analyst[]).map((a) => a.region_code).filter(Boolean)),
+  ];
+  const { data: regionRows } = regionCodes.length
+    ? await supabase.from("region").select("code, name_en, name_cn, is_active").in("code", regionCodes)
+    : { data: [] };
+  const regionMap: Record<string, { name_en: string; name_cn: string; code: string; is_active: boolean }> = {};
+  if (regionRows) {
+    for (const r of regionRows) regionMap[r.code] = r;
+  }
+
+  const items: Analyst[] = (data as Analyst[]).map((a) => ({
+    ...a,
+    region: a.region_code ? (regionMap[a.region_code] ?? null) : null,
+  }));
+
+  return ok({ items, total, page: params.page, totalPages });
 }
 
 /**
- * Create a new analyst with email unique validation
+ * Create a new analyst. email is the PK (text).
+ * No FK on region_code — region fetched separately.
  */
 export async function createAnalyst(params: {
-  full_name: string;
+  english_name: string;
   chinese_name?: string;
   email: string;
   region_code: string;
@@ -87,11 +99,10 @@ export async function createAnalyst(params: {
   const { data, error } = await supabase
     .from("analyst")
     .insert(params)
-    .select("*, region(id, name_en, name_cn, code, is_active)")
+    .select("*")
     .single();
 
   if (error) {
-    // Handle unique constraint violations
     if (error.code === "23505") {
       if (error.message.includes("email")) {
         return err("Email already exists");
@@ -102,16 +113,28 @@ export async function createAnalyst(params: {
 
   if (!data) return err("Failed to create analyst");
 
-  return ok(data as Analyst);
+  // Fetch region in JS
+  let region: Analyst["region"] = null;
+  if (data.region_code) {
+    const { data: r } = await supabase
+      .from("region")
+      .select("code, name_en, name_cn, is_active")
+      .eq("code", data.region_code)
+      .maybeSingle();
+    region = r ?? null;
+  }
+
+  return ok({ ...data, region });
 }
 
 /**
- * Update an existing analyst with email unique validation
+ * Update an existing analyst. Lookup by email (PK).
+ * No FK on region_code — region fetched separately.
  */
 export async function updateAnalyst(
-  id: string,
+  email: string,
   params: {
-    full_name?: string;
+    english_name?: string;
     chinese_name?: string;
     email?: string;
     region_code?: string;
@@ -125,12 +148,11 @@ export async function updateAnalyst(
   const { data, error } = await supabase
     .from("analyst")
     .update(params)
-    .eq("id", id)
-    .select("*, region(id, name_en, name_cn, code, is_active)")
+    .eq("email", email)
+    .select("*")
     .single();
 
   if (error) {
-    // Handle unique constraint violations
     if (error.code === "23505") {
       if (error.message.includes("email")) {
         return err("Email already exists");
@@ -141,16 +163,27 @@ export async function updateAnalyst(
 
   if (!data) return err("Failed to update analyst");
 
-  return ok(data as Analyst);
+  // Fetch region in JS
+  let region: Analyst["region"] = null;
+  if (data.region_code) {
+    const { data: r } = await supabase
+      .from("region")
+      .select("code, name_en, name_cn, is_active")
+      .eq("code", data.region_code)
+      .maybeSingle();
+    region = r ?? null;
+  }
+
+  return ok({ ...data, region });
 }
 
 /**
- * Delete an analyst
+ * Delete an analyst by email (PK)
  */
-export async function deleteAnalyst(id: string): Promise<Result<null>> {
+export async function deleteAnalyst(email: string): Promise<Result<null>> {
   const supabase = await createServerClient();
 
-  const { error } = await supabase.from("analyst").delete().eq("id", id);
+  const { error } = await supabase.from("analyst").delete().eq("email", email);
 
   if (error) return err(error.message);
 
@@ -186,19 +219,37 @@ export async function getRegionsForSelect(): Promise<
 }
 
 /**
- * Get all active analysts for coverage form selector
+ * Get all active analysts for form selector.
+ * No FK on region_code — region join done in JS.
  */
 export async function listAllActiveAnalysts(): Promise<Result<Analyst[]>> {
   const supabase = await createServerClient();
 
   const { data, error } = await supabase
     .from("analyst")
-    .select("*, region(id, name_en, name_cn, code, is_active)")
+    .select("*")
     .eq("is_active", true)
-    .order("full_name", { ascending: true });
+    .order("english_name", { ascending: true });
 
   if (error) return err(error.message);
   if (!data) return err("Failed to fetch analysts");
 
-  return ok(data as Analyst[]);
+  // JS-side region join
+  const regionCodes = [
+    ...new Set((data as Analyst[]).map((a) => a.region_code).filter(Boolean)),
+  ];
+  const { data: regionRows } = regionCodes.length
+    ? await supabase.from("region").select("code, name_en, name_cn, is_active").in("code", regionCodes)
+    : { data: [] };
+  const regionMap: Record<string, { name_en: string; name_cn: string; code: string; is_active: boolean }> = {};
+  if (regionRows) {
+    for (const r of regionRows) regionMap[r.code] = r;
+  }
+
+  const items: Analyst[] = (data as Analyst[]).map((a) => ({
+    ...a,
+    region: a.region_code ? (regionMap[a.region_code] ?? null) : null,
+  }));
+
+  return ok(items);
 }

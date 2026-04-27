@@ -1,0 +1,1 @@
+ALTER TABLE "_analytics"."system_metrics" ADD CONSTRAINT "system_metrics_pkey" PRIMARY KEY (id);

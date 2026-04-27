@@ -6,39 +6,36 @@ import { createServerClient } from "@/lib/supabase/server";
 
 export type { PaginatedList };
 
+// New schema: english_full_name -> english_name, chinese_short_name -> chinese_name
+// Removed: ads_conversion_factor, is_duplicate, approved_by, approved_at
 export type Coverage = {
   id: string;
   ticker: string;
-  english_full_name: string;
-  chinese_short_name: string | null;
+  english_name: string;
+  chinese_name: string | null;
   traditional_chinese: string | null;
   sector_id: string;
   isin: string;
   country_of_domicile: string;
   reporting_currency: string | null;
-  ads_conversion_factor: number | null;
-  is_duplicate: boolean;
-  approved_by: string | null;
-  approved_at: string | null;
   is_active: boolean;
   created_at: string;
   updated_at: string;
 };
 
+// New schema: analyst_id -> analyst_email, sort_order -> author_order
 export type CoverageAnalyst = {
   id: string;
   coverage_id: string;
-  analyst_id: string;
-  role: number;
-  sort_order: number;
+  analyst_email: string;
+  author_order: number;
   created_at: string;
   updated_at: string;
-  // Joined data
+  // Joined analyst data
   analyst?: {
-    id: string;
-    full_name: string;
-    chinese_name: string | null;
     email: string;
+    english_name: string | null;
+    chinese_name: string | null;
   };
 };
 
@@ -52,16 +49,17 @@ export type CoverageWithDetails = Coverage & {
   analysts: CoverageAnalyst[];
 };
 
+// Input type for creating/updating coverage analysts
 export type CoverageAnalystInput = {
-  analyst_id: string;
-  role: number;
-  sort_order: number;
+  analyst_email: string;
+  author_order: number;
 };
 
 const PAGE_SIZE = 15;
 
 /**
- * List coverages with pagination, search, and sector filter
+ * List coverages with pagination, search, and sector filter.
+ * No FK constraints on sector_id / analyst_email — all joins done in JS.
  */
 export async function listCoverages(params: {
   page: number;
@@ -70,56 +68,27 @@ export async function listCoverages(params: {
 }): Promise<Result<PaginatedList<CoverageWithDetails>>> {
   const supabase = await createServerClient();
 
-  let queryBuilder = supabase.from("coverage").select(
-    `
-      *,
-      sector:sector_id (
-        id,
-        name_en,
-        name_cn,
-        level
-      ),
-      analysts:coverage_analyst (
-        id,
-        coverage_id,
-        analyst_id,
-        role,
-        sort_order,
-        created_at,
-        updated_at,
-        analyst:analyst_id (
-          id,
-          full_name,
-          chinese_name,
-          email
-        )
-      )
-    `,
-    { count: "exact" },
-  );
+  let queryBuilder = supabase
+    .from("coverage")
+    .select("*", { count: "exact" });
 
-  // Apply search filter
   if (params.query) {
     const searchTerm = `%${params.query}%`;
     queryBuilder = queryBuilder.or(
-      `ticker.ilike.${searchTerm},english_full_name.ilike.${searchTerm},chinese_short_name.ilike.${searchTerm}`,
+      `ticker.ilike.${searchTerm},english_name.ilike.${searchTerm},chinese_name.ilike.${searchTerm}`,
     );
   }
 
-  // Apply sector filter
   if (params.sector_id) {
     queryBuilder = queryBuilder.eq("sector_id", params.sector_id);
   }
 
-  // Apply pagination
   const from = (params.page - 1) * PAGE_SIZE;
   const to = from + PAGE_SIZE - 1;
 
-  queryBuilder = queryBuilder
+  const { data, error, count } = await queryBuilder
     .order("updated_at", { ascending: false })
     .range(from, to);
-
-  const { data, error, count } = await queryBuilder;
 
   if (error) return err(error.message);
   if (!data) return err("Failed to fetch coverages");
@@ -127,8 +96,70 @@ export async function listCoverages(params: {
   const total = count ?? 0;
   const totalPages = Math.ceil(total / PAGE_SIZE);
 
+  // JS-side joins: fetch sectors, coverage_analysts, and analysts
+  const sectorIds = [
+    ...new Set((data as Coverage[]).map((c) => c.sector_id).filter(Boolean)),
+  ];
+  const coverageIds = (data as Coverage[]).map((c) => c.id);
+  const allAnalystEmails: string[] = [];
+
+  const { data: sectorRows } = sectorIds.length
+    ? await supabase.from("sector").select("id, name_en, name_cn, level").in("id", sectorIds)
+    : { data: [] };
+  const { data: caRows } = coverageIds.length
+    ? await supabase
+        .from("coverage_analyst")
+        .select("id, coverage_id, analyst_email, author_order, created_at, updated_at")
+        .in("coverage_id", coverageIds)
+        .order("author_order", { ascending: true })
+    : { data: [] };
+
+  if (caRows) {
+    for (const ca of caRows) {
+      if (ca.analyst_email) allAnalystEmails.push(ca.analyst_email.toLowerCase());
+    }
+  }
+
+  const { data: analystRows } = allAnalystEmails.length
+    ? await supabase
+        .from("analyst")
+        .select("email, english_name, chinese_name")
+        .in("email", [...new Set(allAnalystEmails)])
+    : { data: [] };
+
+  // Build lookup maps
+  const sectorMap: Record<string, { id: string; name_en: string; name_cn: string | null; level: number }> = {};
+  if (sectorRows) {
+    for (const s of sectorRows) {
+      sectorMap[s.id] = s;
+    }
+  }
+  const analystMap: Record<string, { email: string; english_name: string | null; chinese_name: string | null }> = {};
+  if (analystRows) {
+    for (const a of analystRows) {
+      // analyst.email is guaranteed lowercase by DB CHECK; normalize lookup key
+      analystMap[a.email.toLowerCase()] = a;
+    }
+  }
+  const caByCoverage: Record<string, CoverageAnalyst[]> = {};
+  if (caRows) {
+    for (const ca of caRows) {
+      if (!caByCoverage[ca.coverage_id]) caByCoverage[ca.coverage_id] = [];
+      caByCoverage[ca.coverage_id].push(ca);
+    }
+  }
+
+  const items: CoverageWithDetails[] = (data as Coverage[]).map((c) => ({
+    ...c,
+    sector: sectorMap[c.sector_id] ?? undefined,
+    analysts: (caByCoverage[c.id] ?? []).map((ca) => ({
+      ...ca,
+      analyst: analystMap[ca.analyst_email?.toLowerCase() ?? ""] ?? undefined,
+    })),
+  }));
+
   return ok({
-    items: data as CoverageWithDetails[],
+    items,
     total,
     page: params.page,
     totalPages,
@@ -136,7 +167,8 @@ export async function listCoverages(params: {
 }
 
 /**
- * Get a single coverage by ID with details
+ * Get a single coverage by ID with details.
+ * No FK constraints on sector_id / analyst_email — all joins done in JS.
  */
 export async function getCoverage(
   id: string,
@@ -145,54 +177,74 @@ export async function getCoverage(
 
   const { data, error } = await supabase
     .from("coverage")
-    .select(
-      `
-      *,
-      sector:sector_id (
-        id,
-        name_en,
-        name_cn,
-        level
-      ),
-      analysts:coverage_analyst (
-        id,
-        coverage_id,
-        analyst_id,
-        role,
-        sort_order,
-        created_at,
-        updated_at,
-        analyst:analyst_id (
-          id,
-          full_name,
-          chinese_name,
-          email
-        )
-      )
-    `,
-    )
+    .select("*")
     .eq("id", id)
     .single();
 
   if (error) return err(error.message);
   if (!data) return err("Coverage not found");
 
-  return ok(data as CoverageWithDetails);
+  const coverage = data as Coverage;
+
+  // JS-side joins: fetch sector, coverage_analysts, and analyst details
+  const [{ data: sectorRow }, { data: caRows }] = await Promise.all([
+    coverage.sector_id
+      ? supabase
+          .from("sector")
+          .select("id, name_en, name_cn, level")
+          .eq("id", coverage.sector_id)
+          .maybeSingle()
+      : Promise.resolve({ data: null }),
+    supabase
+      .from("coverage_analyst")
+      .select("id, coverage_id, analyst_email, author_order, created_at, updated_at")
+      .eq("coverage_id", id)
+      .order("author_order", { ascending: true }),
+  ]);
+
+  const analystEmails = (caRows ?? [])
+    .map((ca) => ca.analyst_email?.toLowerCase() ?? "")
+    .filter(Boolean);
+  const { data: analystRows } = analystEmails.length
+    ? await supabase
+        .from("analyst")
+        .select("email, english_name, chinese_name")
+        .in("email", analystEmails)
+    : { data: [] };
+
+  const analystMap: Record<string, { email: string; english_name: string | null; chinese_name: string | null }> = {};
+  if (analystRows) {
+    for (const a of analystRows) {
+      // analyst.email is guaranteed lowercase by DB CHECK; normalize lookup key
+      analystMap[a.email.toLowerCase()] = a;
+    }
+  }
+
+  const analysts: CoverageAnalyst[] = (caRows ?? []).map((ca) => ({
+    ...ca,
+    analyst: analystMap[ca.analyst_email?.toLowerCase() ?? ""] ?? undefined,
+  }));
+
+  return ok({
+    ...coverage,
+    sector: sectorRow ?? undefined,
+    analysts,
+  });
 }
 
 /**
  * Create a new coverage with analysts
+ * analysts are linked via analyst_email (text, not uuid)
  */
 export async function createCoverage(params: {
   ticker: string;
   country_of_domicile: string;
-  english_full_name: string;
-  chinese_short_name?: string | null;
+  english_name: string;
+  chinese_name?: string | null;
   traditional_chinese?: string | null;
   sector_id: string;
   isin: string;
   reporting_currency?: string | null;
-  ads_conversion_factor?: number | null;
   analysts: CoverageAnalystInput[];
 }): Promise<Result<CoverageWithDetails>> {
   const supabase = await createServerClient();
@@ -208,23 +260,22 @@ export async function createCoverage(params: {
     .insert({
       ticker: params.ticker,
       country_of_domicile: params.country_of_domicile,
-      english_full_name: params.english_full_name,
-      chinese_short_name: params.chinese_short_name ?? null,
+      english_name: params.english_name,
+      chinese_name: params.chinese_name ?? null,
       traditional_chinese: params.traditional_chinese ?? null,
       sector_id: params.sector_id,
       isin: params.isin,
       reporting_currency: params.reporting_currency ?? null,
-      ads_conversion_factor: params.ads_conversion_factor ?? null,
     })
     .select()
     .single();
 
   if (coverageError) {
     if (coverageError.code === "23505") {
-      if (coverageError.message.includes("ticker")) {
+      if (coverageError.message.toLowerCase().includes("ticker")) {
         return err("Ticker already exists");
       }
-      if (coverageError.message.includes("isin")) {
+      if (coverageError.message.toLowerCase().includes("isin")) {
         return err("ISIN already exists");
       }
     }
@@ -233,12 +284,11 @@ export async function createCoverage(params: {
 
   if (!coverage) return err("Failed to create coverage");
 
-  // Create coverage_analyst relations
+  // Create coverage_analyst relations using analyst_email
   const analystRecords = params.analysts.map((a) => ({
     coverage_id: coverage.id,
-    analyst_id: a.analyst_id,
-    role: a.role,
-    sort_order: a.sort_order,
+    analyst_email: a.analyst_email.toLowerCase(),
+    author_order: a.author_order,
   }));
 
   const { error: analystsError } = await supabase
@@ -250,7 +300,7 @@ export async function createCoverage(params: {
     await supabase.from("coverage").delete().eq("id", coverage.id);
 
     if (
-      analystsError.message.includes("a coverage can have at most 4 analysts")
+      analystsError.message.toLowerCase().includes("4 analysts")
     ) {
       return err("A coverage can have at most 4 analysts");
     }
@@ -269,13 +319,12 @@ export async function updateCoverage(
   params: {
     ticker?: string;
     country_of_domicile?: string;
-    english_full_name?: string;
-    chinese_short_name?: string | null;
+    english_name?: string;
+    chinese_name?: string | null;
     traditional_chinese?: string | null;
     sector_id?: string;
     isin?: string;
     reporting_currency?: string | null;
-    ads_conversion_factor?: number | null;
     is_active?: boolean;
     analysts?: CoverageAnalystInput[];
   },
@@ -294,18 +343,16 @@ export async function updateCoverage(
   if (params.ticker !== undefined) updateData.ticker = params.ticker;
   if (params.country_of_domicile !== undefined)
     updateData.country_of_domicile = params.country_of_domicile;
-  if (params.english_full_name !== undefined)
-    updateData.english_full_name = params.english_full_name;
-  if (params.chinese_short_name !== undefined)
-    updateData.chinese_short_name = params.chinese_short_name;
+  if (params.english_name !== undefined)
+    updateData.english_name = params.english_name;
+  if (params.chinese_name !== undefined)
+    updateData.chinese_name = params.chinese_name;
   if (params.traditional_chinese !== undefined)
     updateData.traditional_chinese = params.traditional_chinese;
   if (params.sector_id !== undefined) updateData.sector_id = params.sector_id;
   if (params.isin !== undefined) updateData.isin = params.isin;
   if (params.reporting_currency !== undefined)
     updateData.reporting_currency = params.reporting_currency;
-  if (params.ads_conversion_factor !== undefined)
-    updateData.ads_conversion_factor = params.ads_conversion_factor;
   if (params.is_active !== undefined) updateData.is_active = params.is_active;
 
   if (Object.keys(updateData).length > 0) {
@@ -316,10 +363,10 @@ export async function updateCoverage(
 
     if (updateError) {
       if (updateError.code === "23505") {
-        if (updateError.message.includes("ticker")) {
+        if (updateError.message.toLowerCase().includes("ticker")) {
           return err("Ticker already exists");
         }
-        if (updateError.message.includes("isin")) {
+        if (updateError.message.toLowerCase().includes("isin")) {
           return err("ISIN already exists");
         }
       }
@@ -337,12 +384,11 @@ export async function updateCoverage(
 
     if (deleteError) return err(deleteError.message);
 
-    // Insert new analysts
+    // Insert new analysts using analyst_email
     const analystRecords = params.analysts.map((a) => ({
       coverage_id: id,
-      analyst_id: a.analyst_id,
-      role: a.role,
-      sort_order: a.sort_order,
+      analyst_email: a.analyst_email.toLowerCase(),
+      author_order: a.author_order,
     }));
 
     const { error: insertError } = await supabase

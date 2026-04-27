@@ -1,0 +1,2 @@
+ALTER TABLE "_supavisor"."users" ADD CONSTRAINT "users_tenant_external_id_fkey" FOREIGN KEY (tenant_external_id) REFERENCES _supavisor.tenants(external_id) ON DELETE CASCADE;
+CREATE INDEX "users_db_user_alias_tenant_external_id_mode_type_index" ON "_supavisor"."users" (db_user_alias, tenant_external_id, mode_type);

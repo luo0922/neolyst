@@ -1,0 +1,2 @@
+ALTER TABLE "auth"."saml_relay_states" ADD CONSTRAINT "request_id not empty" CHECK ((char_length(request_id) > 0));
+ALTER TABLE "auth"."saml_relay_states" ADD CONSTRAINT "saml_relay_states_pkey" PRIMARY KEY (id);

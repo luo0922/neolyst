@@ -1,0 +1,1 @@
+CREATE INDEX "tenants_external_id_index" ON "_supavisor"."tenants" (external_id);

@@ -63,10 +63,10 @@ export async function createAnalystAction(
 }
 
 /**
- * Update an existing analyst
+ * Update an existing analyst (lookup by email)
  */
 export async function updateAnalystAction(
-  id: string,
+  email: string,
   input: unknown,
 ): Promise<Result<Analyst>> {
   await requireAdminOrThrow();
@@ -76,7 +76,7 @@ export async function updateAnalystAction(
     return err(parsed.error.issues[0]?.message ?? "Invalid input.");
   }
 
-  const result = await updateAnalystRepo(id, parsed.data);
+  const result = await updateAnalystRepo(email, parsed.data);
   if (result.ok) {
     revalidatePath("/analyst-info");
   }
@@ -84,12 +84,12 @@ export async function updateAnalystAction(
 }
 
 /**
- * Delete an analyst
+ * Delete an analyst by email
  */
-export async function deleteAnalystAction(id: string): Promise<Result<null>> {
+export async function deleteAnalystAction(email: string): Promise<Result<null>> {
   await requireAdminOrThrow();
 
-  const result = await deleteAnalystRepo(id);
+  const result = await deleteAnalystRepo(email);
   if (!result.ok) {
     return result;
   }

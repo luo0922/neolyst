@@ -1,0 +1,1 @@
+ALTER TABLE "public"."chief_approve" ADD CONSTRAINT "chief_approve_pkey" PRIMARY KEY (id);

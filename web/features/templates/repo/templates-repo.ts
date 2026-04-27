@@ -3,16 +3,14 @@ import "server-only";
 import { err, ok, type Result } from "@/lib/result";
 import { createServerClient } from "@/lib/supabase/server";
 
+// New schema: table is now report_template, PK is text id = "${report_type}_${language}"
+// Removed: version, sort, uploaded_by, name
 export type Template = {
-  id: string;
-  name: string;
+  id: string; // now: report_type_language format e.g., "company_en"
   report_type: string;
   language: "en" | "zh";
   template_file_path: string;
   schema_file_path: string | null;
-  version: number;
-  sort: number;
-  uploaded_by: string | null;
   created_at: string;
   updated_at: string;
 };
@@ -40,21 +38,22 @@ function hasTemplateFile(template: Pick<Template, "template_file_path">): boolea
 
 /**
  * List all templates grouped by report_type and language
+ * Each (report_type, language) pair has exactly one row (no versioning)
  */
 export async function listTemplatesGrouped(): Promise<Result<TemplateGroup[]>> {
   const supabase = await createServerClient();
 
-  // 查询所有模板，按 sort 排序，同 sort 内按 version 倒序
+  // New schema: report_template table, no version/sort columns
   const { data, error } = await supabase
-    .from("template")
+    .from("report_template")
     .select("*")
-    .order("sort", { ascending: true })
-    .order("version", { ascending: false });
+    .order("report_type", { ascending: true })
+    .order("language", { ascending: true });
 
   if (error) return err(error.message);
   if (!data) return err("Failed to fetch templates");
 
-  // Group by (report_type, language)，每个 group 只取第一条（version 最高）
+  // Group by (report_type, language) - each group has at most 1 row in new schema
   const groups = new Map<string, Template[]>();
 
   for (const row of data as Template[]) {
@@ -64,7 +63,6 @@ export async function listTemplatesGrouped(): Promise<Result<TemplateGroup[]>> {
     }
   }
 
-  // Convert to TemplateGroup format
   const result: TemplateGroup[] = [];
 
   for (const [key, templates] of groups) {
@@ -77,13 +75,8 @@ export async function listTemplatesGrouped(): Promise<Result<TemplateGroup[]>> {
     });
   }
 
-  // Sort by sort field, then language
-  result.sort((a, b) => {
-    const sortA = a.templates[0]?.sort ?? 0;
-    const sortB = b.templates[0]?.sort ?? 0;
-    if (sortA !== sortB) return sortA - sortB;
-    return a.language.localeCompare(b.language);
-  });
+  // Sort by report_type
+  result.sort((a, b) => a.report_type.localeCompare(b.report_type));
 
   return ok(result);
 }
@@ -97,7 +90,7 @@ export async function listTemplates(params?: {
   const supabase = await createServerClient();
 
   let query = supabase
-    .from("template")
+    .from("report_template")
     .select("*")
     .order("created_at", { ascending: false });
 
@@ -120,7 +113,7 @@ export async function getTemplate(id: string): Promise<Result<Template>> {
   const supabase = await createServerClient();
 
   const { data, error } = await supabase
-    .from("template")
+    .from("report_template")
     .select("*")
     .eq("id", id)
     .single();
@@ -136,14 +129,16 @@ export async function listTemplateReportTypes(): Promise<Result<string[]>> {
 
   const { data, error } = await supabase
     .from("report_type")
-    .select("code")
+    .select("report_type")
     .eq("is_active", true)
     .order("sort", { ascending: true });
 
   if (error) return err(error.message);
   if (!data) return err("Failed to fetch report types");
 
-  const codes = data.map((item) => item.code).filter((code): code is string => Boolean(code));
+  const codes = data
+    .map((item) => item.report_type as string)
+    .filter((code): code is string => Boolean(code));
 
   return ok(codes);
 }
@@ -155,7 +150,7 @@ export async function hasValidTemplateForReportType(
   const supabase = await createServerClient();
 
   let query = supabase
-    .from("template")
+    .from("report_template")
     .select("id, template_file_path")
     .eq("report_type", reportType);
 
@@ -169,12 +164,16 @@ export async function hasValidTemplateForReportType(
   if (!data || data.length === 0) return ok(false);
 
   return ok(
-    data.some((item) => Boolean(item.template_file_path && item.template_file_path.trim().length > 0)),
+    data.some(
+      (item) =>
+        item.template_file_path && item.template_file_path.trim().length > 0,
+    ),
   );
 }
 
 /**
- * Get the latest template for a report_type and language (no activation needed)
+ * Get the template for a report_type and language
+ * No versioning - returns the single row if it exists and has a file
  */
 export async function getLatestTemplate(
   report_type: ReportType,
@@ -183,12 +182,10 @@ export async function getLatestTemplate(
   const supabase = await createServerClient();
 
   const { data, error } = await supabase
-    .from("template")
+    .from("report_template")
     .select("*")
     .eq("report_type", report_type)
     .eq("language", language)
-    .order("version", { ascending: false })
-    .limit(1)
     .maybeSingle();
 
   if (error) return err(error.message);
@@ -200,52 +197,28 @@ export async function getLatestTemplate(
 }
 
 /**
- * Get the next version number for a report_type and language
- */
-export async function getNextVersion(
-  report_type: ReportType,
-  language: "en" | "zh" = "en",
-): Promise<number> {
-  const supabase = await createServerClient();
-
-  const { data } = await supabase
-    .from("template")
-    .select("version")
-    .eq("report_type", report_type)
-    .eq("language", language)
-    .order("version", { ascending: false })
-    .limit(1)
-    .single();
-
-  return (data?.version ?? 0) + 1;
-}
-
-/**
- * Create a new template
+ * Create a new template record.
+ * id is auto-generated as ${report_type}_${language} on the server side (via upsert_template_record RPC)
+ * or directly here by constructing the id.
  */
 export async function createTemplate(params: {
-  name: string;
   report_type: ReportType;
   language?: "en" | "zh";
   template_file_path: string;
   schema_file_path?: string | null;
-  uploaded_by: string;
 }): Promise<Result<Template>> {
   const supabase = await createServerClient();
   const language = params.language ?? "en";
-
-  const version = await getNextVersion(params.report_type, language);
+  const id = `${params.report_type}_${language}`;
 
   const { data, error } = await supabase
-    .from("template")
+    .from("report_template")
     .insert({
-      name: params.name,
+      id,
       report_type: params.report_type,
       language,
       template_file_path: params.template_file_path,
       schema_file_path: params.schema_file_path ?? null,
-      version,
-      uploaded_by: params.uploaded_by,
     })
     .select()
     .single();
@@ -260,106 +233,28 @@ export async function createTemplate(params: {
 }
 
 /**
- * Update template metadata (not file)
+ * Update template file paths (server updates template_file_path and schema_file_path)
+ * No name/version fields in new schema
  */
 export async function updateTemplate(
   id: string,
-  params: {
-    name?: string;
-  }
+  _params: Record<string, never>,
 ): Promise<Result<Template>> {
+  // In the new schema, there are no updateable fields other than file paths
+  // which are updated via upload + upsert_template_record RPC
+  // This function is kept for API compatibility but does nothing
   const supabase = await createServerClient();
 
   const { data, error } = await supabase
-    .from("template")
-    .update(params)
+    .from("report_template")
+    .select("*")
     .eq("id", id)
-    .select()
     .single();
 
   if (error) return err(error.message);
-  if (!data) return err("Failed to update template");
+  if (!data) return err("Template not found");
 
   return ok(data as Template);
-}
-
-/**
- * Update template file for a report_type and language (update existing record, not create new version)
- */
-export async function updateTemplateFile(params: {
-  report_type: ReportType;
-  language: "en" | "zh";
-  name?: string;
-  template_file_path?: string;
-  schema_file_path?: string | null;
-  uploaded_by: string;
-}): Promise<Result<Template>> {
-  const supabase = await createServerClient();
-
-  // Find the existing template for this report_type and language
-  const { data: existing, error: findError } = await supabase
-    .from("template")
-    .select("*")
-    .eq("report_type", params.report_type)
-    .eq("language", params.language)
-    .order("version", { ascending: false })
-    .limit(1)
-    .single();
-
-  if (findError && findError.code !== "PGRST116") {
-    // PGRST116 = no rows returned
-    return err(findError.message);
-  }
-
-  if (existing) {
-    // Update existing record
-    const updateData: Record<string, unknown> = {
-      uploaded_by: params.uploaded_by,
-      updated_at: new Date().toISOString(),
-    };
-
-    if (params.name !== undefined) {
-      updateData.name = params.name;
-    }
-    if (params.template_file_path !== undefined) {
-      updateData.template_file_path = params.template_file_path;
-    }
-    if (params.schema_file_path !== undefined) {
-      updateData.schema_file_path = params.schema_file_path;
-    }
-
-    const { data, error } = await supabase
-      .from("template")
-      .update(updateData)
-      .eq("id", existing.id)
-      .select()
-      .single();
-
-    if (error) return err(error.message);
-    if (!data) return err("Failed to update template");
-
-    return ok(data as Template);
-  } else {
-    // No existing template, create new one with version 1
-    const { data, error } = await supabase
-      .from("template")
-      .insert({
-        name: params.name || `${params.report_type}_template`,
-        report_type: params.report_type,
-        language: params.language,
-        template_file_path: params.template_file_path || "",
-        schema_file_path: params.schema_file_path ?? null,
-        version: 1,
-        uploaded_by: params.uploaded_by,
-      })
-      .select()
-      .single();
-
-    if (error) return err(error.message);
-    if (!data) return err("Failed to create template");
-
-    return ok(data as Template);
-  }
 }
 
 /**
@@ -368,7 +263,10 @@ export async function updateTemplateFile(params: {
 export async function deleteTemplate(id: string): Promise<Result<null>> {
   const supabase = await createServerClient();
 
-  const { error } = await supabase.from("template").delete().eq("id", id);
+  const { error } = await supabase
+    .from("report_template")
+    .delete()
+    .eq("id", id);
 
   if (error) return err(error.message);
 

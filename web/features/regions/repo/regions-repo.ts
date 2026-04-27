@@ -6,8 +6,8 @@ import { createServerClient } from "@/lib/supabase/server";
 
 export type { PaginatedList };
 
+// New schema: PK is code (text), no id column
 export type Region = {
-  id: string;
   name_en: string;
   name_cn: string;
   code: string;
@@ -92,10 +92,10 @@ export async function createRegion(params: {
 }
 
 /**
- * Update an existing region with unique validation
+ * Update an existing region with unique validation. Lookup by code (PK).
  */
 export async function updateRegion(
-  id: string,
+  code: string,
   params: {
     name_en?: string;
     name_cn?: string;
@@ -107,7 +107,7 @@ export async function updateRegion(
   const { data, error } = await supabase
     .from("region")
     .update(params)
-    .eq("id", id)
+    .eq("code", code)
     .select()
     .single();
 
@@ -130,12 +130,12 @@ export async function updateRegion(
 }
 
 /**
- * Delete a region (ON DELETE SET NULL will handle analyst references)
+ * Delete a region. Lookup by code (PK).
  */
-export async function deleteRegion(id: string): Promise<Result<null>> {
+export async function deleteRegion(code: string): Promise<Result<null>> {
   const supabase = await createServerClient();
 
-  const { error } = await supabase.from("region").delete().eq("id", id);
+  const { error } = await supabase.from("region").delete().eq("code", code);
 
   if (error) return err(error.message);
 

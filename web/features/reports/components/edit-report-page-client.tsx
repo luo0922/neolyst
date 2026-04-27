@@ -24,14 +24,10 @@ import type { Rating } from "@/features/ratings/repo/ratings-repo";
 import type { SectorWithChildren } from "@/features/sectors/repo/sectors-repo";
 import {
   type ReportDetail,
-  type ReportSummary,
 } from "@/features/reports/repo/reports-repo";
-import type { UserRow } from "@/domain/user";
 import {
-  createReportAction,
   directSubmitReportAction,
   getReportDownloadUrlAction,
-  saveChiefApproveAction,
   saveReportContentAction,
   submitReportAction,
   uploadReportFileAction,
@@ -41,8 +37,6 @@ import {
   validateWordPptExtension,
   validatePdfExtension,
 } from "@/features/reports/file-utils";
-
-type FormAnalyst = ReportAnalystInput;
 
 const LANGUAGE_OPTIONS: { value: ReportLanguage; label: string }[] = [
   { value: "en", label: "English" },
@@ -102,7 +96,6 @@ export interface EditReportPageClientProps {
   sectors: SectorWithChildren[];
   coverages: CoverageWithDetails[];
   ratings: Rating[];
-  users: UserRow[];
 }
 
 export function EditReportPageClient({
@@ -115,7 +108,6 @@ export function EditReportPageClient({
   sectors,
   coverages,
   ratings,
-  users,
 }: EditReportPageClientProps) {
   const router = useRouter();
   const toast = useToast();
@@ -174,19 +166,18 @@ export function EditReportPageClient({
   const [formLanguage, setFormLanguage] = React.useState<ReportLanguage>(
     initialReport.report_language ?? "en",
   );
-  const [formContactPersonId, setFormContactPersonId] = React.useState(
-    initialReport.contact_person_id ?? "",
+  const [formContactPerson, setFormContactPerson] = React.useState(
+    initialReport.contact_person ?? "",
   );
   const [formInvestmentThesis, setFormInvestmentThesis] = React.useState(
     initialReport.investment_thesis ?? "",
   );
-  const [formAnalysts, setFormAnalysts] = React.useState<FormAnalyst[]>(
+  const [formAnalysts, setFormAnalysts] = React.useState<ReportAnalystInput[]>(
     initialReport.analysts
-      .sort((a, b) => a.sort_order - b.sort_order)
+      .sort((a, b) => a.author_order - b.author_order)
       .map((item) => ({
-        analyst_id: item.analyst_id,
-        role: item.role,
-        sort_order: item.sort_order,
+        analyst_email: item.analyst_email,
+        author_order: item.author_order,
       })),
   );
   const [formErrors, setFormErrors] = React.useState<Record<string, string>>(
@@ -194,11 +185,8 @@ export function EditReportPageClient({
   );
 
   const [reportFile, setReportFile] = React.useState<File | null>(null);
-  const [pdfFile, setPdfFile] = React.useState<File | null>(
-    initialReport.latest_version?.pdf_file_path ? new File([], initialReport.latest_version?.pdf_file_name ?? "report.pdf") : null
-  );
+  const [pdfFile, setPdfFile] = React.useState<File | null>(null);
   const [modelFile, setModelFile] = React.useState<File | null>(null);
-  const [chiefApprovalScreenshotFile, setChiefApprovalScreenshotFile] = React.useState<File | null>(null);
 
   React.useEffect(() => {
     if (!reportTypes.includes(formReportType) && reportTypes.length > 0) {
@@ -212,16 +200,21 @@ export function EditReportPageClient({
     const selectedOthers = new Set(
       formAnalysts
         .filter((_, idx) => idx !== index)
-        .map((item) => item.analyst_id)
+        .map((item) => item.analyst_email)
         .filter(Boolean),
     );
-    const current = formAnalysts[index]?.analyst_id;
+    const current = formAnalysts[index]?.analyst_email;
 
     return [
       { value: "", label: "Select analyst..." },
       ...analysts
-        .filter((item) => item.id === current || !selectedOthers.has(item.id))
-        .map((item) => ({ value: item.id, label: item.full_name })),
+        .filter(
+          (item) => item.email === current || !selectedOthers.has(item.email),
+        )
+        .map((item) => ({
+          value: item.email,
+          label: `${item.english_name ?? item.email} (${item.email})`,
+        })),
     ];
   }
 
@@ -231,7 +224,7 @@ export function EditReportPageClient({
     }
     setFormAnalysts((prev) => [
       ...prev,
-      { analyst_id: "", role: prev.length + 1, sort_order: prev.length + 1 },
+      { analyst_email: "", author_order: prev.length + 1 },
     ]);
   }
 
@@ -239,29 +232,28 @@ export function EditReportPageClient({
     setFormAnalysts((prev) =>
       prev
         .filter((_, idx) => idx !== index)
-        .map((item, idx) => ({ ...item, role: idx + 1, sort_order: idx + 1 })),
+        .map((item, idx) => ({ ...item, author_order: idx + 1 })),
     );
   }
 
-  function updateAnalyst(index: number, analystId: string) {
+  function updateAnalyst(index: number, analystEmail: string) {
     setFormAnalysts((prev) => {
       const next = [...prev];
-      next[index] = { ...next[index], analyst_id: analystId };
+      next[index] = { ...next[index], analyst_email: analystEmail };
       return next;
     });
   }
 
-  function buildValidatedAnalysts(): FormAnalyst[] {
+  function buildValidatedAnalysts(): ReportAnalystInput[] {
     return formAnalysts
-      .filter((item) => item.analyst_id)
+      .filter((item) => item.analyst_email)
       .map((item, index) => ({
-        analyst_id: item.analyst_id,
-        role: index + 1,
-        sort_order: index + 1,
+        analyst_email: item.analyst_email,
+        author_order: index + 1,
       }));
   }
 
-  function validateForm(): FormAnalyst[] | null {
+  function validateForm(): ReportAnalystInput[] | null {
     const errors: Record<string, string> = {};
 
     if (!formTitle.trim()) {
@@ -273,7 +265,9 @@ export function EditReportPageClient({
     }
 
     const validatedAnalysts = buildValidatedAnalysts();
-    const unique = new Set(validatedAnalysts.map((item) => item.analyst_id));
+    const unique = new Set(
+      validatedAnalysts.map((item) => item.analyst_email.toLowerCase()),
+    );
     if (unique.size !== validatedAnalysts.length) {
       errors.analysts = "Analysts must be unique";
     }
@@ -285,38 +279,22 @@ export function EditReportPageClient({
     return validatedAnalysts;
   }
 
-  async function uploadReportFiles(params: {
-    reportId: string;
-    versionNo: number;
-  }): Promise<
+  async function uploadReportFiles(): Promise<
     | {
         ok: true;
         data: {
-          word_file_path: string | null;
-          word_file_name: string | null;
-          pdf_file_path: string | null;
-          pdf_file_name: string | null;
-          model_file_path: string | null;
-          model_file_name: string | null;
+          word_path: string | null;
+          pdf_path: string | null;
+          model_path: string | null;
         };
       }
-    | {
-        ok: false;
-        error: string;
-      }
+    | { ok: false; error: string }
   > {
-    let wordFilePath: string | null =
-      activeReport?.latest_version?.word_file_path ?? null;
-    let wordFileName: string | null =
-      activeReport?.latest_version?.word_file_name ?? null;
-    let pdfFilePath: string | null =
-      activeReport?.latest_version?.pdf_file_path ?? null;
-    let pdfFileName: string | null =
-      activeReport?.latest_version?.pdf_file_name ?? null;
-    let modelFilePath: string | null =
-      activeReport?.latest_version?.model_file_path ?? null;
-    let modelFileName: string | null =
-      activeReport?.latest_version?.model_file_name ?? null;
+    const reportId = activeReport.id;
+
+    let wordPath: string | null = activeReport?.word_path ?? null;
+    let pdfPath: string | null = activeReport?.pdf_path ?? null;
+    let modelPath: string | null = activeReport?.model_path ?? null;
 
     // Upload Word/PPT file
     if (reportFile) {
@@ -327,16 +305,14 @@ export function EditReportPageClient({
 
       const fd = new FormData();
       fd.append("file", reportFile);
-      fd.append("reportId", params.reportId);
-      fd.append("versionNo", String(params.versionNo));
+      fd.append("reportId", reportId);
       fd.append("label", "report");
 
       const result = await uploadReportFileAction(fd);
       if (!result.ok) {
         return { ok: false, error: result.error };
       }
-      wordFilePath = result.file_path;
-      wordFileName = reportFile.name;
+      wordPath = result.file_path;
     }
 
     // Upload PDF file
@@ -348,16 +324,14 @@ export function EditReportPageClient({
 
       const fd = new FormData();
       fd.append("file", pdfFile);
-      fd.append("reportId", params.reportId);
-      fd.append("versionNo", String(params.versionNo));
+      fd.append("reportId", reportId);
       fd.append("label", "report-pdf");
 
       const result = await uploadReportFileAction(fd);
       if (!result.ok) {
         return { ok: false, error: result.error };
       }
-      pdfFilePath = result.file_path;
-      pdfFileName = pdfFile.name;
+      pdfPath = result.file_path;
     }
 
     // Upload Model file
@@ -369,69 +343,24 @@ export function EditReportPageClient({
 
       const fd = new FormData();
       fd.append("file", modelFile);
-      fd.append("reportId", params.reportId);
-      fd.append("versionNo", String(params.versionNo));
+      fd.append("reportId", reportId);
       fd.append("label", "model");
 
       const result = await uploadReportFileAction(fd);
       if (!result.ok) {
         return { ok: false, error: result.error };
       }
-      modelFilePath = result.file_path;
-      modelFileName = modelFile.name;
+      modelPath = result.file_path;
     }
 
     return {
       ok: true,
       data: {
-        word_file_path: wordFilePath,
-        word_file_name: wordFileName,
-        pdf_file_path: pdfFilePath,
-        pdf_file_name: pdfFileName,
-        model_file_path: modelFilePath,
-        model_file_name: modelFileName,
+        word_path: wordPath,
+        pdf_path: pdfPath,
+        model_path: modelPath,
       },
     };
-  }
-
-  async function uploadChiefApprovalScreenshot(params: {
-    reportId: string;
-  }): Promise<{ ok: boolean; error?: string }> {
-    if (!chiefApprovalScreenshotFile) {
-      return { ok: true };
-    }
-
-    const allowedExtensions = [".jpg", ".jpeg", ".png", ".gif", ".webp"];
-    const fileName = chiefApprovalScreenshotFile.name.toLowerCase();
-    const ext = fileName.match(/\.[^.]+$/)?.[0] ?? "";
-
-    if (!allowedExtensions.includes(ext)) {
-      return { ok: false, error: "Chief approval screenshot must be an image (jpg, png, gif, webp)" };
-    }
-
-    const fd = new FormData();
-    fd.append("file", chiefApprovalScreenshotFile);
-    fd.append("reportId", params.reportId);
-    fd.append("label", "chief-approval");
-
-    const result = await uploadReportFileAction(fd);
-    if (!result.ok) {
-      return { ok: false, error: result.error };
-    }
-
-    // Save to chief_approve table
-    const saveResult = await saveChiefApproveAction({
-      report_id: params.reportId,
-      file_path: result.file_path,
-      file_name: chiefApprovalScreenshotFile.name,
-      file_type: chiefApprovalScreenshotFile.type,
-    });
-
-    if (!saveResult.ok) {
-      return { ok: false, error: saveResult.error };
-    }
-
-    return { ok: true };
   }
 
   async function handleSaveDraft() {
@@ -447,23 +376,7 @@ export function EditReportPageClient({
 
     setSaving(true);
     try {
-      // Upload chief approval screenshot first (if any)
-      if (chiefApprovalScreenshotFile) {
-        const chiefUploadResult = await uploadChiefApprovalScreenshot({
-          reportId: activeReport.id,
-        });
-        if (!chiefUploadResult.ok) {
-          toast.error(chiefUploadResult.error ?? "Upload failed", { title: "Error" });
-          setSaving(false);
-          return;
-        }
-      }
-
-      const uploadResult = await uploadReportFiles({
-        reportId: activeReport.id,
-        versionNo: activeReport.current_version_no + 1,
-      });
-
+      const uploadResult = await uploadReportFiles();
       if (!uploadResult.ok) {
         toast.error(uploadResult.error, { title: "Error" });
         return;
@@ -479,16 +392,12 @@ export function EditReportPageClient({
         region_code: formRegionCode || null,
         sector_id: formSectorId || null,
         report_language: formLanguage,
-        contact_person_id: formContactPersonId || null,
+        contact_person: formContactPerson || null,
         investment_thesis: formInvestmentThesis || null,
-        certificate_confirmed: activeReport.certificate_confirmed,
         analysts: analystsValue,
-        word_file_path: uploadResult.data.word_file_path,
-        word_file_name: uploadResult.data.word_file_name,
-        pdf_file_path: uploadResult.data.pdf_file_path,
-        pdf_file_name: uploadResult.data.pdf_file_name,
-        model_file_path: uploadResult.data.model_file_path,
-        model_file_name: uploadResult.data.model_file_name,
+        word_path: uploadResult.data.word_path,
+        pdf_path: uploadResult.data.pdf_path,
+        model_path: uploadResult.data.model_path,
       });
 
       if (!saveResult.ok) {
@@ -500,9 +409,7 @@ export function EditReportPageClient({
       setReportFile(null);
       setPdfFile(null);
       setModelFile(null);
-      setChiefApprovalScreenshotFile(null);
       toast.success("Draft saved.", { title: "Success" });
-      router.refresh();
       router.refresh();
     } finally {
       setSaving(false);
@@ -512,12 +419,6 @@ export function EditReportPageClient({
   async function handleSubmit() {
     if (!activeReport) {
       toast.error("Please save draft first.", { title: "Error" });
-      return;
-    }
-
-    // Validate chief approval screenshot is required for submit
-    if (!activeReport.chief_approve?.file_path) {
-      toast.error("Chief approval screenshot is required for submit.", { title: "Error" });
       return;
     }
 
@@ -552,22 +453,7 @@ export function EditReportPageClient({
 
     setSaving(true);
     try {
-      // Upload chief approval screenshot first (if any)
-      if (chiefApprovalScreenshotFile) {
-        const chiefUploadResult = await uploadChiefApprovalScreenshot({
-          reportId: activeReport.id,
-        });
-        if (!chiefUploadResult.ok) {
-          toast.error(chiefUploadResult.error ?? "Upload failed", { title: "Error" });
-          setSaving(false);
-          return;
-        }
-      }
-
-      const uploadResult = await uploadReportFiles({
-        reportId: activeReport.id,
-        versionNo: activeReport.current_version_no + 1,
-      });
+      const uploadResult = await uploadReportFiles();
       if (!uploadResult.ok) {
         toast.error(uploadResult.error, { title: "Error" });
         return;
@@ -583,16 +469,12 @@ export function EditReportPageClient({
         region_code: formRegionCode || null,
         sector_id: formSectorId || null,
         report_language: formLanguage,
-        contact_person_id: formContactPersonId || null,
+        contact_person: formContactPerson || null,
         investment_thesis: formInvestmentThesis || null,
-        certificate_confirmed: activeReport.certificate_confirmed,
         analysts: analystsValue,
-        word_file_path: uploadResult.data.word_file_path,
-        word_file_name: uploadResult.data.word_file_name,
-        pdf_file_path: uploadResult.data.pdf_file_path,
-        pdf_file_name: uploadResult.data.pdf_file_name,
-        model_file_path: uploadResult.data.model_file_path,
-        model_file_name: uploadResult.data.model_file_name,
+        word_path: uploadResult.data.word_path,
+        pdf_path: uploadResult.data.pdf_path,
+        model_path: uploadResult.data.model_path,
       });
 
       if (!directResult.ok) {
@@ -604,7 +486,6 @@ export function EditReportPageClient({
       setReportFile(null);
       setPdfFile(null);
       setModelFile(null);
-      setChiefApprovalScreenshotFile(null);
       toast.success("Report submitted.", { title: "Success" });
       router.push("/reports");
       router.refresh();
@@ -624,7 +505,6 @@ export function EditReportPageClient({
       return;
     }
 
-    // Open with download using fetch and blob
     try {
       const response = await fetch(result.data);
       const blob = await response.blob();
@@ -637,16 +517,8 @@ export function EditReportPageClient({
       window.URL.revokeObjectURL(url);
       document.body.removeChild(a);
     } catch {
-      // Fallback to simple open if fetch fails
       window.open(result.data, "_blank", "noopener,noreferrer");
     }
-  }
-
-  function getVersionReason(versionNo: number): string | null {
-    const matched = activeReport.status_logs.find(
-      (item) => item.version_no === versionNo && item.reason,
-    );
-    return matched?.reason ?? null;
   }
 
   return (
@@ -658,8 +530,7 @@ export function EditReportPageClient({
               Analyst Revise
             </div>
             <div className="text-xs text-[var(--fg-secondary)]">
-              Draft ID: {activeReport.id.slice(0, 8)}... / v
-              {activeReport.current_version_no}
+              Draft ID: {activeReport.id.slice(0, 8)}...
             </div>
           </div>
           <Link
@@ -690,7 +561,9 @@ export function EditReportPageClient({
           <Select
             label="Report Type"
             value={formReportType}
-            onChange={(event) => setFormReportType(event.target.value as ReportType)}
+            onChange={(event) =>
+              setFormReportType(event.target.value as ReportType)
+            }
             options={reportTypeOptions}
             error={formErrors.report_type}
             disabled={!canEdit}
@@ -708,9 +581,11 @@ export function EditReportPageClient({
                 ...coverages
                   .filter((c) => c.analysts.length > 0)
                   .map((c) => {
-                    const firstAnalyst = [...c.analysts]
-                      .sort((a, b) => a.sort_order - b.sort_order)[0];
-                    const analystName = firstAnalyst?.analyst?.full_name || "Unknown";
+                    const firstAnalyst = [...c.analysts].sort(
+                      (a, b) => a.author_order - b.author_order,
+                    )[0];
+                    const analystName =
+                      firstAnalyst?.analyst?.english_name ?? "Unknown";
                     return {
                       value: c.ticker,
                       label: `${c.ticker} - ${analystName}`,
@@ -740,7 +615,7 @@ export function EditReportPageClient({
                 value={formTargetPrice}
                 onChange={(event) => {
                   const value = event.target.value;
-                  if (value === '' || /^\d*\.?\d*$/.test(value)) {
+                  if (value === "" || /^\d*\.?\d*$/.test(value)) {
                     setFormTargetPrice(value);
                   }
                 }}
@@ -799,7 +674,9 @@ export function EditReportPageClient({
 
           <div className="space-y-2 rounded-[8px] border border-[var(--border-subtle)] bg-[var(--bg-surface-hover)]/40 p-4">
             <div className="flex items-center justify-between">
-              <div className="text-sm font-medium text-[var(--fg-primary)]">Analyst</div>
+              <div className="text-sm font-medium text-[var(--fg-primary)]">
+                Analyst
+              </div>
               {canEdit ? (
                 <Button type="button" variant="ghost" onClick={addAnalyst}>
                   Add Analyst
@@ -807,16 +684,16 @@ export function EditReportPageClient({
               ) : null}
             </div>
             {formAnalysts.length === 0 ? (
-              <p className="text-sm text-[var(--fg-primary)]0">No analyst assigned.</p>
+              <p className="text-sm text-[var(--fg-primary)]">No analyst assigned.</p>
             ) : (
               formAnalysts.map((item, index) => (
                 <div
-                  key={`${item.analyst_id}-${index}`}
+                  key={`${item.analyst_email}-${index}`}
                   className="grid grid-cols-12 gap-2"
                 >
                   <div className="col-span-9">
                     <Select
-                      value={item.analyst_id}
+                      value={item.analyst_email}
                       onChange={(event) =>
                         updateAnalyst(index, event.target.value)
                       }
@@ -849,15 +726,15 @@ export function EditReportPageClient({
 
           <SearchableSelect
             label="Contact Person"
-            value={formContactPersonId}
-            onChange={setFormContactPersonId}
-            placeholder="Search user..."
+            value={formContactPerson}
+            onChange={setFormContactPerson}
+            placeholder="Search analyst..."
             disabled={!canEdit}
             options={[
               { value: "", label: "Select contact person..." },
-              ...users.map((user) => ({
-                value: user.id,
-                label: user.fullName || user.email,
+              ...analysts.map((a) => ({
+                value: a.email,
+                label: `${a.english_name ?? a.email} (${a.email})`,
               })),
             ]}
           />
@@ -876,67 +753,97 @@ export function EditReportPageClient({
             Report Files
           </h2>
 
-          {/* Existing Files - Show all uploaded files together */}
-          {activeReport.latest_version?.word_file_path ||
-          activeReport.latest_version?.model_file_path ||
-          activeReport.chief_approve?.file_path ? (
+          {/* Existing Files */}
+          {activeReport.word_path ||
+          activeReport.pdf_path ||
+          activeReport.model_path ? (
             <div className="space-y-2">
-              {activeReport.latest_version?.word_file_path ? (
+              {activeReport.word_path ? (
                 <div className="rounded-[8px] border border-[var(--border-subtle)] bg-[var(--bg-surface-hover)]/40 p-3">
                   <button
                     type="button"
                     className="flex items-center gap-2 text-sm text-blue-500 hover:underline"
                     onClick={() =>
                       handleDownload(
-                        activeReport.latest_version!.word_file_path!,
-                        activeReport.latest_version!.word_file_name ?? "report",
+                        activeReport.word_path!,
+                        activeReport.word_path!.split("/").pop() ?? "report",
                       )
                     }
                   >
-                    <svg className="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+                    <svg
+                      className="h-4 w-4"
+                      fill="none"
+                      stroke="currentColor"
+                      viewBox="0 0 24 24"
+                    >
+                      <path
+                        strokeLinecap="round"
+                        strokeLinejoin="round"
+                        strokeWidth={2}
+                        d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"
+                      />
                     </svg>
-                    Report : {activeReport.latest_version.word_file_name ?? "Unknown"}
+                    Report File
                   </button>
                 </div>
               ) : null}
 
-              {activeReport.latest_version?.model_file_path ? (
+              {activeReport.pdf_path ? (
                 <div className="rounded-[8px] border border-[var(--border-subtle)] bg-[var(--bg-surface-hover)]/40 p-3">
                   <button
                     type="button"
                     className="flex items-center gap-2 text-sm text-blue-500 hover:underline"
                     onClick={() =>
                       handleDownload(
-                        activeReport.latest_version!.model_file_path!,
-                        activeReport.latest_version!.model_file_name ?? "model",
+                        activeReport.pdf_path!,
+                        activeReport.pdf_path!.split("/").pop() ?? "report.pdf",
                       )
                     }
                   >
-                    <svg className="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+                    <svg
+                      className="h-4 w-4"
+                      fill="none"
+                      stroke="currentColor"
+                      viewBox="0 0 24 24"
+                    >
+                      <path
+                        strokeLinecap="round"
+                        strokeLinejoin="round"
+                        strokeWidth={2}
+                        d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"
+                      />
                     </svg>
-                    Model : {activeReport.latest_version.model_file_name ?? "Unknown"}
+                    PDF File
                   </button>
                 </div>
               ) : null}
 
-              {activeReport.chief_approve?.file_path ? (
+              {activeReport.model_path ? (
                 <div className="rounded-[8px] border border-[var(--border-subtle)] bg-[var(--bg-surface-hover)]/40 p-3">
                   <button
                     type="button"
                     className="flex items-center gap-2 text-sm text-blue-500 hover:underline"
                     onClick={() =>
                       handleDownload(
-                        activeReport.chief_approve!.file_path,
-                        activeReport.chief_approve!.file_name ?? "screenshot",
+                        activeReport.model_path!,
+                        activeReport.model_path!.split("/").pop() ?? "model",
                       )
                     }
                   >
-                    <svg className="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+                    <svg
+                      className="h-4 w-4"
+                      fill="none"
+                      stroke="currentColor"
+                      viewBox="0 0 24 24"
+                    >
+                      <path
+                        strokeLinecap="round"
+                        strokeLinejoin="round"
+                        strokeWidth={2}
+                        d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"
+                      />
                     </svg>
-                    Chief Approval Screenshot : {activeReport.chief_approve.file_name ?? "Unknown"}
+                    Model File
                   </button>
                 </div>
               ) : null}
@@ -974,77 +881,6 @@ export function EditReportPageClient({
                 : "Optional for non-Company reports"
             }
           />
-
-          <FileDropzone
-            label="Chief Approval Screenshot"
-            accept=".jpg,.jpeg,.png,.gif,.webp"
-            file={chiefApprovalScreenshotFile}
-            onFileChange={setChiefApprovalScreenshotFile}
-            disabled={!canEdit}
-            hint="Required for Submit (jpg, png, gif, webp)"
-          />
-        </section>
-
-        {/* Version History Section */}
-        <section className="space-y-4 rounded-[12px] border border-[var(--border-subtle)] bg-[var(--bg-surface)]/70 p-5">
-          <h2 className="text-sm font-semibold uppercase tracking-wider text-[var(--fg-secondary)]">
-            Report Version History
-          </h2>
-          {activeReport.versions.length === 0 ? (
-            <p className="text-sm text-[var(--fg-primary)]0">No versions yet.</p>
-          ) : (
-            <div className="space-y-2">
-              {activeReport.versions.map((item) => (
-                <div
-                  key={item.id}
-                  className="rounded-[8px] border border-[var(--border-subtle)] bg-[var(--bg-surface-hover)]/40 p-3 text-sm"
-                >
-                  <div className="flex items-center gap-2 text-[var(--fg-primary)]">
-                    <span className="rounded bg-zinc-600 px-2 py-0.5 text-xs text-white">
-                      v{item.version_no}
-                    </span>
-                    <span>Changed by {item.changed_by_name ?? `${item.changed_by.slice(0, 8)}...`}</span>
-                  </div>
-                  <div className="mt-1 text-xs text-[var(--fg-primary)]0">
-                    {formatDateTime(item.changed_at)}
-                  </div>
-                  {item.word_file_path || item.model_file_path ? (
-                    <div className="mt-2 space-y-1">
-                      {item.word_file_path ? (
-                        <button
-                          type="button"
-                          className="flex items-center gap-1 text-xs text-blue-500 hover:underline"
-                          onClick={() => handleDownload(item.word_file_path!, item.word_file_name ?? "report")}
-                        >
-                          <svg className="h-3 w-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
-                          </svg>
-                          {item.word_file_name ?? "Report File"}
-                        </button>
-                      ) : null}
-                      {item.model_file_path ? (
-                        <button
-                          type="button"
-                          className="flex items-center gap-1 text-xs text-blue-500 hover:underline"
-                          onClick={() => handleDownload(item.model_file_path!, item.model_file_name ?? "model")}
-                        >
-                          <svg className="h-3 w-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
-                          </svg>
-                          {item.model_file_name ?? "Model File"}
-                        </button>
-                      ) : null}
-                    </div>
-                  ) : null}
-                  {getVersionReason(item.version_no) ? (
-                    <div className="mt-1 text-xs text-amber-300">
-                      Note: {getVersionReason(item.version_no)}
-                    </div>
-                  ) : null}
-                </div>
-              ))}
-            </div>
-          )}
         </section>
 
         {/* Status History Section */}
@@ -1053,7 +889,7 @@ export function EditReportPageClient({
             Report Status History
           </h2>
           {activeReport.status_logs.length === 0 ? (
-            <p className="text-sm text-[var(--fg-primary)]0">No history yet.</p>
+            <p className="text-sm text-[var(--fg-tertiary)]">No history yet.</p>
           ) : (
             <div className="space-y-2">
               {activeReport.status_logs.map((item) => (
@@ -1063,13 +899,10 @@ export function EditReportPageClient({
                 >
                   <div className="flex items-center gap-2 text-[var(--fg-primary)]">
                     <span>{item.from_status}</span>
-                    <span className="text-[var(--fg-primary)]0">-&gt;</span>
+                    <span className="text-[var(--fg-tertiary)]">-&gt;</span>
                     <span>{item.to_status}</span>
-                    <span className="rounded bg-zinc-600 px-2 py-0.5 text-xs text-white">
-                      v{item.version_no}
-                    </span>
                   </div>
-                  <div className="mt-1 text-xs text-[var(--fg-primary)]0">
+                  <div className="mt-1 text-xs text-[var(--fg-tertiary)]">
                     {formatDateTime(item.action_at)} by{" "}
                     {item.action_by_name ??
                       `${item.action_by.slice(0, 8)}...`}
@@ -1077,34 +910,6 @@ export function EditReportPageClient({
                   {item.reason ? (
                     <div className="mt-1 text-xs text-amber-300">
                       Note: {item.reason}
-                    </div>
-                  ) : null}
-                  {item.word_file_path || item.model_file_path ? (
-                    <div className="mt-2 space-y-1">
-                      {item.word_file_path ? (
-                        <button
-                          type="button"
-                          className="flex items-center gap-1 text-xs text-blue-500 hover:underline"
-                          onClick={() => handleDownload(item.word_file_path!, item.word_file_name ?? "report")}
-                        >
-                          <svg className="h-3 w-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
-                          </svg>
-                          {item.word_file_name ?? "Report File"}
-                        </button>
-                      ) : null}
-                      {item.model_file_path ? (
-                        <button
-                          type="button"
-                          className="flex items-center gap-1 text-xs text-blue-500 hover:underline"
-                          onClick={() => handleDownload(item.model_file_path!, item.model_file_name ?? "model")}
-                        >
-                          <svg className="h-3 w-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
-                          </svg>
-                          {item.model_file_name ?? "Model File"}
-                        </button>
-                      ) : null}
                     </div>
                   ) : null}
                 </div>

@@ -1,0 +1,2 @@
+ALTER TABLE "public"."coverage" ADD CONSTRAINT "coverage_ads_conversion_factor_check" CHECK ((ads_conversion_factor > (0)::numeric));
+ALTER TABLE "public"."coverage" ADD CONSTRAINT "coverage_pkey" PRIMARY KEY (id);

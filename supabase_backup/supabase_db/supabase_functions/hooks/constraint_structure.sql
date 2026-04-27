@@ -1,0 +1,1 @@
+ALTER TABLE "supabase_functions"."hooks" ADD CONSTRAINT "hooks_pkey" PRIMARY KEY (id);

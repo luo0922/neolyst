@@ -1,0 +1,1 @@
+ALTER TABLE "kong"."locks" ADD CONSTRAINT "locks_pkey" PRIMARY KEY (key);

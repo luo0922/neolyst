@@ -1,0 +1,2 @@
+ALTER TABLE "_analytics"."source_schemas" ADD CONSTRAINT "source_schemas_source_id_fkey" FOREIGN KEY (source_id) REFERENCES _analytics.sources(id) ON DELETE CASCADE;
+CREATE INDEX "source_schemas_source_id_index" ON "_analytics"."source_schemas" (source_id);

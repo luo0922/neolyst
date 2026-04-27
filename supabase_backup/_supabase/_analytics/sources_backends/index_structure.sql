@@ -1,0 +1,2 @@
+ALTER TABLE "_analytics"."sources_backends" ADD CONSTRAINT "sources_backends_backend_id_fkey" FOREIGN KEY (backend_id) REFERENCES _analytics.backends(id);
+ALTER TABLE "_analytics"."sources_backends" ADD CONSTRAINT "sources_backends_source_id_fkey" FOREIGN KEY (source_id) REFERENCES _analytics.sources(id);

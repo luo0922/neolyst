@@ -16,7 +16,7 @@ export const reportStatuses = [
 ] as const;
 
 export const reportLanguages = ["zh", "en"] as const;
-export const reportFileLabels = ["report", "report-pdf", "model", "chief-approval"] as const;
+export const reportFileLabels = ["report", "report-pdf", "model"] as const;
 
 export const reportStatusActions = [
   "submit",
@@ -34,29 +34,29 @@ const reportTypeSchema = z
 const optionalShortText = z.string().trim().max(255, "Value too long").nullable().optional();
 const optionalLongText = z.string().trim().max(35000, "Investment Thesis Value too long").nullable().optional();
 
+// New analyst schema: analyst_email (text, not uuid) + author_order
 export const reportAnalystInputSchema = z.object({
-  analyst_id: z.string().uuid("Analyst is required"),
-  role: z.number().int().min(1).max(4),
-  sort_order: z.number().int().min(1).max(4),
+  analyst_email: z.string().email("Valid analyst email is required"),
+  author_order: z.number().int().min(1).max(4),
 });
 
 const reportAnalystsSchema = z
   .array(reportAnalystInputSchema)
   .max(4, "Maximum 4 analysts allowed")
   .superRefine((analysts, ctx) => {
-    const analystIds = new Set(analysts.map((item) => item.analyst_id));
-    if (analystIds.size !== analysts.length) {
+    const analystEmails = new Set(analysts.map((item) => item.analyst_email.toLowerCase()));
+    if (analystEmails.size !== analysts.length) {
       ctx.addIssue({
         code: z.ZodIssueCode.custom,
         message: "Analysts must be unique",
       });
     }
 
-    const orders = new Set(analysts.map((item) => item.sort_order));
+    const orders = new Set(analysts.map((item) => item.author_order));
     if (orders.size !== analysts.length) {
       ctx.addIssue({
         code: z.ZodIssueCode.custom,
-        message: "Sort order must be unique",
+        message: "Author order must be unique",
       });
     }
   });
@@ -70,23 +70,22 @@ const reportEditableFieldsSchema = z.object({
   region_code: z.string().max(10).nullable().optional(),
   sector_id: z.string().nullable().optional().transform((v) => (v === "" ? null : v)),
   report_language: z.enum(reportLanguages).nullable().optional(),
-  contact_person_id: z.string().nullable().optional().transform((v) => (v === "" ? null : v)),
+  // contact_person is now an email (text) referencing analyst.email, not a uuid user id
+  contact_person: z.string().nullable().optional().transform((v) => (v === "" ? null : v)),
   investment_thesis: optionalLongText,
-  certificate_confirmed: z.boolean().optional().default(false),
+  // certificate_confirmed removed per schema change
   coverage_id: z.string().nullable().optional().transform((v) => (v === "" ? null : v)),
   analysts: reportAnalystsSchema.default([]),
-  word_file_path: z.string().trim().min(1).nullable().optional(),
-  word_file_name: z.string().trim().nullable().optional(),
-  pdf_file_path: z.string().trim().min(1).nullable().optional(),
-  pdf_file_name: z.string().trim().nullable().optional(),
-  model_file_path: z.string().trim().min(1).nullable().optional(),
-  model_file_name: z.string().trim().nullable().optional(),
+  // File paths are now stored directly on report, not in report_version
+  word_path: z.string().trim().nullable().optional(),
+  pdf_path: z.string().trim().nullable().optional(),
+  model_path: z.string().trim().nullable().optional(),
 });
 
 export const reportCreateSchema = reportEditableFieldsSchema.omit({
-  word_file_path: true,
-  pdf_file_path: true,
-  model_file_path: true,
+  word_path: true,
+  pdf_path: true,
+  model_path: true,
 });
 
 export const reportSaveSchema = reportEditableFieldsSchema.extend({
@@ -124,6 +123,12 @@ export const reportDirectSubmitSchema = reportEditableFieldsSchema.extend({
 export const reportDownloadSchema = z.object({
   report_id: z.string().uuid("Report ID is required"),
   file_path: z.string().trim().min(1, "File path is required"),
+});
+
+// New schema for reject action
+export const reportRejectSchema = z.object({
+  report_id: z.string().uuid("Report ID is required"),
+  reason: z.string().trim().min(1, "Rejection reason is required").max(1000, "Reason too long"),
 });
 
 export type ReportType = string;

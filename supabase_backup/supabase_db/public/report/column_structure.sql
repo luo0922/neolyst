@@ -1,0 +1,22 @@
+CREATE TABLE IF NOT EXISTS "public"."report"(
+ "id" uuid  DEFAULT gen_random_uuid()   NOT NULL ,
+ "owner_user_id" uuid   NOT NULL ,
+ "title" text   NOT NULL ,
+ "report_type" text   NOT NULL ,
+ "status" text  DEFAULT 'draft'::text   NOT NULL ,
+ "current_version_no" integer  DEFAULT 0   NOT NULL ,
+ "coverage_id" uuid   ,
+ "sector_id" uuid   ,
+ "published_by" uuid   ,
+ "published_at" timestamp with time zone   ,
+ "created_at" timestamp with time zone  DEFAULT now()   NOT NULL ,
+ "updated_at" timestamp with time zone  DEFAULT now()   NOT NULL ,
+ "ticker" text   ,
+ "rating" text   ,
+ "target_price" numeric   ,
+ "report_language" text   ,
+ "investment_thesis" text   ,
+ "certificate_confirmed" boolean  DEFAULT false   NOT NULL ,
+ "contact_person_id" uuid   ,
+ "region_code" text   
+);

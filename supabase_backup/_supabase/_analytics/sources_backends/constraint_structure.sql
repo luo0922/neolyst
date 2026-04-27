@@ -1,0 +1,1 @@
+ALTER TABLE "_analytics"."sources_backends" ADD CONSTRAINT "sources_backends_pkey" PRIMARY KEY (id);

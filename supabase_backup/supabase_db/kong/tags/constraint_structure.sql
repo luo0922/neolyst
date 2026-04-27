@@ -1,0 +1,1 @@
+ALTER TABLE "kong"."tags" ADD CONSTRAINT "tags_pkey" PRIMARY KEY (entity_id);

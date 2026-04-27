@@ -1,0 +1,1 @@
+ALTER TABLE "dataset_0aece77c_f8b8_484a_8322_78b538ecc038_graph"."base" INHERIT "dataset_0aece77c_f8b8_484a_8322_78b538ecc038_graph"."_ag_label_vertex";

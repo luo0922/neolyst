@@ -1,0 +1,3 @@
+ALTER TABLE "_supavisor"."cluster_tenants" ADD CONSTRAINT "cluster_tenants_cluster_alias_fkey" FOREIGN KEY (cluster_alias) REFERENCES _supavisor.clusters(alias) ON DELETE CASCADE;
+ALTER TABLE "_supavisor"."cluster_tenants" ADD CONSTRAINT "cluster_tenants_tenant_external_id_fkey" FOREIGN KEY (tenant_external_id) REFERENCES _supavisor.tenants(external_id);
+CREATE INDEX "cluster_tenants_tenant_external_id_index" ON "_supavisor"."cluster_tenants" (tenant_external_id);

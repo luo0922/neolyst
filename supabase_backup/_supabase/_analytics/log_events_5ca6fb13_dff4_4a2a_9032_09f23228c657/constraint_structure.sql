@@ -1,0 +1,1 @@
+ALTER TABLE "_analytics"."log_events_5ca6fb13_dff4_4a2a_9032_09f23228c657" ADD CONSTRAINT "log_events_5ca6fb13_dff4_4a2a_9032_09f23228c657_pkey" PRIMARY KEY (id);

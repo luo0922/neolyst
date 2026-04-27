@@ -1,0 +1,1 @@
+ALTER TABLE "storage"."objects" ADD CONSTRAINT "objects_pkey" PRIMARY KEY (id);

@@ -101,7 +101,7 @@ export function RegionsPageClient({
 
     setFormLoading(true);
     const res = editingRegion
-      ? await updateRegionAction(editingRegion.id, { name_en, name_cn, code })
+      ? await updateRegionAction(editingRegion.code, { name_en, name_cn, code })
       : await createRegionAction({ name_en, name_cn, code });
     setFormLoading(false);
 
@@ -118,7 +118,7 @@ export function RegionsPageClient({
   }
 
   function openDelete(region: Region) {
-    setDeleteId(region.id);
+    setDeleteId(region.code);
     setDeleteOpen(true);
   }
 
@@ -187,7 +187,7 @@ export function RegionsPageClient({
               </TR>
             ) : (
               regions.map((region) => (
-                <TR key={region.id}>
+                <TR key={region.code}>
                   <TD className="font-medium text-[var(--fg-primary)]">{region.name_en}</TD>
                   <TD className="text-[var(--fg-secondary)]">{region.name_cn}</TD>
                   <TD>

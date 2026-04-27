@@ -1,0 +1,1 @@
+CREATE INDEX "clustering_rpc_requests_node_id_idx" ON "kong"."clustering_rpc_requests" (node_id);

@@ -2,13 +2,9 @@
 
 import { revalidatePath } from "next/cache";
 
-import {
-  templateSchema,
-  templateUpdateSchema,
-} from "@/domain/schemas/template";
+import { templateSchema, templateUpdateSchema } from "@/domain/schemas/template";
 import { err, ok, type Result } from "@/lib/result";
-import { requireAdmin, getCurrentUser, createServiceRoleClient } from "@/lib/supabase/server";
-import { updateTemplate } from "./repo/templates-repo";
+import { requireAdmin, createServiceRoleClient } from "@/lib/supabase/server";
 
 type StorageUploadResult =
   | { ok: true; file_path: string }
@@ -21,7 +17,7 @@ import {
   listTemplates as listTemplatesRepo,
   listTemplatesGrouped as listTemplatesGroupedRepo,
   listTemplateReportTypes as listTemplateReportTypesRepo,
-  updateTemplateFile as updateTemplateFileRepo,
+  updateTemplate as updateTemplateRepo,
   type Template,
   type TemplateGroup,
   type ReportType,
@@ -62,7 +58,7 @@ export async function listTemplatesAction(params?: {
 }
 
 /**
- * List all distinct report types from template table
+ * List all distinct report types from report_type table
  */
 export async function listTemplateReportTypesAction(): Promise<Result<string[]>> {
   try {
@@ -86,10 +82,11 @@ export async function getTemplateAction(id: string): Promise<Result<Template>> {
 }
 
 /**
- * Create a new template version
+ * Create a new template record.
+ * id is auto-generated as ${report_type}_${language}
+ * No name/version/uploaded_by fields in new schema.
  */
 export async function createTemplateAction(input: {
-  name: string;
   report_type: ReportType;
   language?: "en" | "zh";
   template_file_path: string;
@@ -97,22 +94,16 @@ export async function createTemplateAction(input: {
 }): Promise<Result<Template>> {
   await requireAdminOrThrow();
 
-  const user = await getCurrentUser();
-  if (!user) {
-    return err("Unauthorized");
-  }
-
   const parsed = templateSchema.safeParse(input);
   if (!parsed.success) {
     return err(parsed.error.issues[0]?.message ?? "Invalid input.");
   }
 
   const result = await createTemplateRepo({
-    ...parsed.data,
+    report_type: input.report_type,
     language: input.language,
     template_file_path: input.template_file_path,
     schema_file_path: input.schema_file_path ?? null,
-    uploaded_by: user.id,
   });
 
   if (result.ok) {
@@ -122,39 +113,7 @@ export async function createTemplateAction(input: {
 }
 
 /**
- * Update template file for existing template (update current version, not create new)
- */
-export async function updateTemplateFileAction(input: {
-  name?: string;
-  report_type: ReportType;
-  language?: "en" | "zh";
-  template_file_path?: string;
-  schema_file_path?: string | null;
-}): Promise<Result<Template>> {
-  await requireAdminOrThrow();
-
-  const user = await getCurrentUser();
-  if (!user) {
-    return err("Unauthorized");
-  }
-
-  const result = await updateTemplateFileRepo({
-    report_type: input.report_type,
-    language: input.language ?? "en",
-    name: input.name,
-    template_file_path: input.template_file_path,
-    schema_file_path: input.schema_file_path,
-    uploaded_by: user.id,
-  });
-
-  if (result.ok) {
-    revalidatePath("/templates");
-  }
-  return result;
-}
-
-/**
- * Update template metadata
+ * Update template (no-op in new schema - file paths updated via upload)
  */
 export async function updateTemplateAction(
   id: string,
@@ -167,7 +126,7 @@ export async function updateTemplateAction(
     return err(parsed.error.issues[0]?.message ?? "Invalid input.");
   }
 
-  const updateResult = await updateTemplate(id, { name: parsed.data.name });
+  const updateResult = await updateTemplateRepo(id, parsed.data);
 
   if (updateResult.ok) {
     revalidatePath("/templates");

@@ -10,9 +10,9 @@ export {
 } from "./actions";
 
 export type {
-  ReportAnalyst,
-  ReportVersion,
+  ReportAnalystEmail,
   ReportStatusLog,
   ReportSummary,
   ReportDetail,
+  CoverageMatch,
 } from "./repo/reports-repo";

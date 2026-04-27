@@ -1,0 +1,1 @@
+ALTER TABLE "kong"."clustering_data_planes" ADD CONSTRAINT "clustering_data_planes_pkey" PRIMARY KEY (id);

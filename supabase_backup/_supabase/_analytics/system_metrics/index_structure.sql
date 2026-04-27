@@ -1,0 +1,1 @@
+CREATE INDEX "system_metrics_node_index" ON "_analytics"."system_metrics" (node);

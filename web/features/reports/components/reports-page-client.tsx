@@ -74,7 +74,7 @@ export interface ReportsPageClientProps {
 
 export function ReportsPageClient({
   reports,
-  total,
+  total: _total,
   page,
   totalPages,
   currentQuery,

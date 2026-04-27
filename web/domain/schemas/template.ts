@@ -11,18 +11,13 @@ export const reportTypes = [
   "bond",
 ] as const;
 
+// Template schema: id is auto-generated as ${report_type}_${language} on the server side
 export const templateSchema = z.object({
-  name: z.string().min(1, "Name is required").max(200, "Name too long"),
   report_type: z.enum(reportTypes),
+  language: z.enum(["en", "zh"]),
 });
 
-export const templateUpdateSchema = z.object({
-  name: z
-    .string()
-    .min(1, "Name is required")
-    .max(200, "Name too long")
-    .optional(),
-});
+export const templateUpdateSchema = z.object({});
 
 export type TemplateInput = z.infer<typeof templateSchema>;
 export type TemplateUpdateInput = z.infer<typeof templateUpdateSchema>;

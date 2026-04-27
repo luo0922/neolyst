@@ -50,10 +50,10 @@ function toQueryString(params: {
   return s ? `?${s}` : "";
 }
 
+// New analyst input: analyst_email (text) + author_order
 interface AnalystInput {
-  analyst_id: string;
-  role: number;
-  sort_order: number;
+  analyst_email: string;
+  author_order: number;
 }
 
 export function CoveragePageClient({
@@ -72,6 +72,8 @@ export function CoveragePageClient({
   const toast = useToast();
   const canEdit = userRole === "admin" || userRole === "sa";
   const canCreate = userRole === "admin" || userRole === "sa" || userRole === "analyst";
+
+  // Build active sector ID set
   const activeSectorIds = React.useMemo(() => {
     const ids: string[] = [];
     for (const item of sectors) {
@@ -82,8 +84,10 @@ export function CoveragePageClient({
     }
     return new Set(ids);
   }, [sectors]);
-  const activeAnalystIds = React.useMemo(
-    () => new Set(analysts.map((item) => item.id)),
+
+  // Build active analyst email set (email is now the PK)
+  const activeAnalystEmails = React.useMemo(
+    () => new Set(analysts.map((item) => item.email.toLowerCase())),
     [analysts],
   );
 
@@ -107,9 +111,8 @@ export function CoveragePageClient({
   const [formSectorId, setFormSectorId] = React.useState("");
   const [formIsin, setFormIsin] = React.useState("");
   const [formCurrency, setFormCurrency] = React.useState("");
-  const [formAdsFactor, setFormAdsFactor] = React.useState("");
   const [formAnalysts, setFormAnalysts] = React.useState<AnalystInput[]>([
-    { analyst_id: "", role: 1, sort_order: 1 },
+    { analyst_email: "", author_order: 1 },
   ]);
   const [formErrors, setFormErrors] = React.useState<Record<string, string>>(
     {},
@@ -136,8 +139,7 @@ export function CoveragePageClient({
     setFormSectorId("");
     setFormIsin("");
     setFormCurrency("");
-    setFormAdsFactor("");
-    setFormAnalysts([{ analyst_id: "", role: 1, sort_order: 1 }]);
+    setFormAnalysts([{ analyst_email: "", author_order: 1 }]);
     setFormErrors({});
     setFormOpen(true);
   }
@@ -146,21 +148,19 @@ export function CoveragePageClient({
     setEditingCoverage(coverage);
     setFormTicker(coverage.ticker);
     setFormCountry(coverage.country_of_domicile);
-    setFormEnglishName(coverage.english_full_name);
-    setFormChineseName(coverage.chinese_short_name ?? "");
+    setFormEnglishName(coverage.english_name);
+    setFormChineseName(coverage.chinese_name ?? "");
     setFormTraditionalChinese(coverage.traditional_chinese ?? "");
     setFormSectorId(coverage.sector_id);
     setFormIsin(coverage.isin);
     setFormCurrency(coverage.reporting_currency ?? "");
-    setFormAdsFactor(coverage.ads_conversion_factor?.toString() ?? "");
     setFormAnalysts(
       coverage.analysts.length > 0
-        ? coverage.analysts.map((a, i) => ({
-            analyst_id: a.analyst_id,
-            role: a.role,
-            sort_order: i + 1,
+        ? coverage.analysts.map((a) => ({
+            analyst_email: a.analyst_email,
+            author_order: a.author_order,
           }))
-        : [{ analyst_id: "", role: 1, sort_order: 1 }],
+        : [{ analyst_email: "", author_order: 1 }],
     );
     setFormErrors({});
     setFormOpen(true);
@@ -171,9 +171,8 @@ export function CoveragePageClient({
       setFormAnalysts([
         ...formAnalysts,
         {
-          analyst_id: "",
-          role: formAnalysts.length + 1,
-          sort_order: formAnalysts.length + 1,
+          analyst_email: "",
+          author_order: formAnalysts.length + 1,
         },
       ]);
     }
@@ -185,7 +184,7 @@ export function CoveragePageClient({
     }
   }
 
-  function updateAnalyst(
+  function updateAnalystField(
     index: number,
     field: keyof AnalystInput,
     value: string | number,
@@ -196,20 +195,24 @@ export function CoveragePageClient({
   }
 
   function getAnalystOptions(index: number): { value: string; label: string }[] {
-    const currentId = formAnalysts[index]?.analyst_id;
+    const currentEmail = formAnalysts[index]?.analyst_email;
     const selectedByOthers = new Set(
       formAnalysts
-        .filter((item, i) => i !== index && item.analyst_id)
-        .map((item) => item.analyst_id),
+        .filter((item, i) => i !== index && item.analyst_email)
+        .map((item) => item.analyst_email.toLowerCase()),
     );
 
     return [
       { value: "", label: "Select analyst..." },
       ...analysts
-        .filter((item) => item.id === currentId || !selectedByOthers.has(item.id))
+        .filter(
+          (item) =>
+            item.email.toLowerCase() === currentEmail?.toLowerCase() ||
+            !selectedByOthers.has(item.email.toLowerCase()),
+        )
         .map((item) => ({
-          value: item.id,
-          label: item.full_name,
+          value: item.email,
+          label: `${item.english_name} (${item.email})`,
         })),
     ];
   }
@@ -228,15 +231,15 @@ export function CoveragePageClient({
 
     const ticker = formTicker.trim();
     const country_of_domicile = formCountry.trim();
-    const english_full_name = formEnglishName.trim();
+    const english_name = formEnglishName.trim();
     const sector_id = formSectorId;
     const isin = formIsin.trim();
-    const validAnalysts = formAnalysts.filter((a) => a.analyst_id);
+    const validAnalysts = formAnalysts.filter((a) => a.analyst_email);
 
     const next: Record<string, string> = {};
     if (!ticker) next.ticker = "Ticker is required";
     if (!country_of_domicile) next.country = "Country of domicile is required";
-    if (!english_full_name) next.english_name = "English name is required";
+    if (!english_name) next.english_name = "English name is required";
     if (!sector_id) next.sector = "Sector is required";
     if (sector_id && !activeSectorIds.has(sector_id)) {
       next.sector = "Sector must be selected from the active sector list";
@@ -245,11 +248,15 @@ export function CoveragePageClient({
     if (validAnalysts.length === 0) {
       next.analysts = "At least one analyst is required";
     } else {
-      if (!validAnalysts.every((item) => activeAnalystIds.has(item.analyst_id))) {
+      if (
+        !validAnalysts.every((item) =>
+          activeAnalystEmails.has(item.analyst_email.toLowerCase()),
+        )
+      ) {
         next.analysts = "Analyst must be selected from the active analyst list";
       } else if (
-        new Set(validAnalysts.map((item) => item.analyst_id)).size !==
-        validAnalysts.length
+        new Set(validAnalysts.map((item) => item.analyst_email.toLowerCase()))
+          .size !== validAnalysts.length
       ) {
         next.analysts = "Analysts must be unique";
       }
@@ -261,14 +268,16 @@ export function CoveragePageClient({
     const inputData = {
       ticker,
       country_of_domicile,
-      english_full_name,
-      chinese_short_name: formChineseName.trim() || null,
+      english_name,
+      chinese_name: formChineseName.trim() || null,
       traditional_chinese: formTraditionalChinese.trim() || null,
       sector_id,
       isin,
       reporting_currency: formCurrency.trim() || null,
-      ads_conversion_factor: formAdsFactor ? parseFloat(formAdsFactor) : null,
-      analysts: validAnalysts.map((a, i) => ({ ...a, sort_order: i + 1 })),
+      analysts: validAnalysts.map((a, i) => ({
+        analyst_email: a.analyst_email,
+        author_order: i + 1,
+      })),
     };
 
     const res = editingCoverage
@@ -321,7 +330,6 @@ export function CoveragePageClient({
     doSearch();
   }
 
-  // Auto-search when filter changes
   function handleSectorChange(value: string) {
     setSectorFilter(value);
     router.push(
@@ -346,8 +354,8 @@ export function CoveragePageClient({
     analystList: CoverageWithDetails["analysts"],
   ): string {
     return analystList
-      .sort((a, b) => a.sort_order - b.sort_order)
-      .map((a) => a.analyst?.full_name ?? "Unknown")
+      .sort((a, b) => a.author_order - b.author_order)
+      .map((a) => a.analyst?.english_name ?? a.analyst_email)
       .join(", ");
   }
 
@@ -426,7 +434,7 @@ export function CoveragePageClient({
                     {coverage.ticker}
                   </TD>
                   <TD className="text-[var(--fg-secondary)]">
-                    {coverage.english_full_name}
+                    {coverage.english_name}
                   </TD>
                   <TD className="text-[var(--fg-secondary)]">
                     {getSectorName(coverage.sector_id)}
@@ -523,7 +531,7 @@ export function CoveragePageClient({
               ]}
             />
             <Input
-              label="English Full Name *"
+              label="English Name *"
               placeholder="Company full name"
               value={formEnglishName}
               onChange={(e) => setFormEnglishName(e.target.value)}
@@ -532,7 +540,7 @@ export function CoveragePageClient({
           </div>
           <div className="grid grid-cols-2 gap-3">
             <Input
-              label="Chinese Short Name"
+              label="Chinese Name"
               placeholder="中文名称"
               value={formChineseName}
               onChange={(e) => setFormChineseName(e.target.value)}
@@ -544,7 +552,7 @@ export function CoveragePageClient({
               onChange={(e) => setFormTraditionalChinese(e.target.value)}
             />
           </div>
-          <div className="grid grid-cols-3 gap-3">
+          <div className="grid grid-cols-2 gap-3">
             <Select
               label="Sector *"
               value={formSectorId}
@@ -569,14 +577,6 @@ export function CoveragePageClient({
               placeholder="e.g., HKD"
               value={formCurrency}
               onChange={(e) => setFormCurrency(e.target.value)}
-            />
-            <Input
-              label="ADS Conversion Factor"
-              placeholder="e.g., 1"
-              type="number"
-              step="0.000001"
-              value={formAdsFactor}
-              onChange={(e) => setFormAdsFactor(e.target.value)}
             />
           </div>
 
@@ -605,26 +605,11 @@ export function CoveragePageClient({
                 <div className="flex-1">
                   <Select
                     label={index === 0 ? "Analyst" : undefined}
-                    value={analyst.analyst_id}
+                    value={analyst.analyst_email}
                     onChange={(e) =>
-                      updateAnalyst(index, "analyst_id", e.target.value)
+                      updateAnalystField(index, "analyst_email", e.target.value)
                     }
                     options={getAnalystOptions(index)}
-                  />
-                </div>
-                <div className="w-24">
-                  <Select
-                    label={index === 0 ? "Role" : undefined}
-                    value={analyst.role.toString()}
-                    onChange={(e) =>
-                      updateAnalyst(index, "role", parseInt(e.target.value))
-                    }
-                    options={[
-                      { value: "1", label: "Lead" },
-                      { value: "2", label: "2nd" },
-                      { value: "3", label: "3rd" },
-                      { value: "4", label: "4th" },
-                    ]}
                   />
                 </div>
                 {formAnalysts.length > 1 && (

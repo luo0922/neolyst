@@ -1,0 +1,1 @@
+ALTER TABLE "_supavisor"."schema_migrations" ADD CONSTRAINT "schema_migrations_pkey" PRIMARY KEY (version);

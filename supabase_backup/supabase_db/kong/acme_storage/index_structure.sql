@@ -1,0 +1,1 @@
+CREATE INDEX "acme_storage_ttl_idx" ON "kong"."acme_storage" (ttl);

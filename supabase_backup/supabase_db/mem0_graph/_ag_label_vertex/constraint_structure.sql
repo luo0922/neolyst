@@ -1,0 +1,1 @@
+ALTER TABLE "mem0_graph"."_ag_label_vertex" ADD CONSTRAINT "_ag_label_vertex_pkey" PRIMARY KEY (id);

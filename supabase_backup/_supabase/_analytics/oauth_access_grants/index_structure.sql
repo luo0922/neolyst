@@ -1,0 +1,2 @@
+ALTER TABLE "_analytics"."oauth_access_grants" ADD CONSTRAINT "oauth_access_grants_application_id_fkey" FOREIGN KEY (application_id) REFERENCES _analytics.oauth_applications(id);
+CREATE INDEX "oauth_access_grants_token_index" ON "_analytics"."oauth_access_grants" (token);

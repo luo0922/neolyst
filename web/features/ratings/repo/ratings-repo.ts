@@ -3,26 +3,23 @@ import "server-only";
 import { err, ok, type Result } from "@/lib/result";
 import { createServerClient } from "@/lib/supabase/server";
 
+// New schema: only name, code, rank. No id / is_active / created_at.
 export type Rating = {
-  id: string;
   name: string;
   code: string;
-  sort: number;
-  is_active: boolean;
-  created_at: string;
+  rank: number;
 };
 
 /**
- * List all active ratings, sorted by sort field
+ * List all ratings, sorted by rank field
  */
 export async function listAllRatings(): Promise<Result<Rating[]>> {
   const supabase = await createServerClient();
 
   const { data, error } = await supabase
     .from("rating")
-    .select("*")
-    .eq("is_active", true)
-    .order("sort", { ascending: true });
+    .select("name, code, rank")
+    .order("rank", { ascending: true });
 
   if (error) return err(error.message);
   if (!data) return err("Failed to fetch ratings");

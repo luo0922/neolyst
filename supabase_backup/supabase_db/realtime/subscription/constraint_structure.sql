@@ -1,0 +1,1 @@
+ALTER TABLE "realtime"."subscription" ADD CONSTRAINT "pk_subscription" PRIMARY KEY (id);

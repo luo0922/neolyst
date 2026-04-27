@@ -1,0 +1,3 @@
+CREATE INDEX "idx_dataset_0aece77c_f8b8_484a_8322_78b538ecc038_vector_skills_" ON "dataset_0aece77c_f8b8_484a_8322_78b538ecc038_vector"."lightrag_skills" (workspace);
+CREATE INDEX "idx_lightrag_skills_workspace_id" ON "dataset_0aece77c_f8b8_484a_8322_78b538ecc038_vector"."lightrag_skills" (workspace, id);
+CREATE INDEX "idx_lightrag_skills_id" ON "dataset_0aece77c_f8b8_484a_8322_78b538ecc038_vector"."lightrag_skills" (id);

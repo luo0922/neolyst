@@ -1,0 +1,3 @@
+ALTER TABLE "public"."report_push_log" ADD CONSTRAINT "report_push_log_pkey" PRIMARY KEY (id);
+ALTER TABLE "public"."report_push_log" ADD CONSTRAINT "report_push_log_status_check" CHECK ((status = ANY (ARRAY['success'::text, 'failed'::text, 'pending'::text])));
+ALTER TABLE "public"."report_push_log" ADD CONSTRAINT "report_push_log_trigger_type_check" CHECK ((trigger_type = ANY (ARRAY['auto'::text, 'manual'::text])));

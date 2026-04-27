@@ -7,23 +7,23 @@ import { useRouter } from "next/navigation";
 import { Button } from "@/components/ui/button";
 import { FileDropzone } from "@/components/ui/file-dropzone";
 import { Input } from "@/components/ui/input";
-import { Textarea } from "@/components/ui/textarea";
 import { Select } from "@/components/ui/select";
 import { RichTextEditor } from "@/components/ui/rich-text-editor";
 import { useToast } from "@/components/ui/toast";
+import type { ReportAnalystInput } from "@/domain/schemas/report";
 import type { ReportDetail } from "@/features/reports/repo/reports-repo";
 import type { Analyst } from "@/features/analyst-info/repo/analysts-repo";
 import {
   getReportDownloadUrlAction,
   uploadReportFileAction,
 } from "@/features/reports/actions";
+import { validatePdfExtension, validateWordPptExtension } from "@/features/reports/file-utils";
 
 import {
   executeReviewAction,
   getReviewReportDetailAction,
   saveReviewReportAction,
 } from "../actions";
-import { validatePdfExtension, validateWordPptExtension } from "@/features/reports/file-utils";
 
 function formatDateTime(iso: string): string {
   const d = new Date(iso);
@@ -49,7 +49,7 @@ export interface ReviewReportPageProps {
 
 export function ReviewReportPage({
   reportId,
-  userRole,
+  userRole: _userRole,
   analysts: analystsProp,
 }: ReviewReportPageProps) {
   const router = useRouter();
@@ -66,9 +66,7 @@ export function ReviewReportPage({
   // Form state
   const [formTitle, setFormTitle] = React.useState("");
   const [formInvestmentThesis, setFormInvestmentThesis] = React.useState("");
-  const [formAnalysts, setFormAnalysts] = React.useState<{ analyst_id: string; role: number; sort_order: number }[]>([]);
-
-  // File state
+  const [formAnalysts, setFormAnalysts] = React.useState<ReportAnalystInput[]>([]);
 
   React.useEffect(() => {
     async function loadData() {
@@ -85,11 +83,10 @@ export function ReviewReportPage({
       setFormInvestmentThesis(detailResult.data.investment_thesis ?? "");
       setFormAnalysts(
         detailResult.data.analysts
-          .sort((a, b) => a.sort_order - b.sort_order)
+          .sort((a, b) => a.author_order - b.author_order)
           .map((item) => ({
-            analyst_id: item.analyst_id,
-            role: item.role,
-            sort_order: item.sort_order,
+            analyst_email: item.analyst_email,
+            author_order: item.author_order,
           }))
       );
     }
@@ -101,15 +98,19 @@ export function ReviewReportPage({
     const selectedOthers = new Set(
       formAnalysts
         .filter((_, idx) => idx !== index)
-        .map((item) => item.analyst_id)
+        .map((item) => item.analyst_email)
         .filter(Boolean)
     );
-    const current = formAnalysts[index]?.analyst_id;
+    const current = formAnalysts[index]?.analyst_email;
 
     return [
       { value: "", label: "Select analyst..." },
-      ...analystsProp.filter((item) => item.id === current || !selectedOthers.has(item.id))
-        .map((item) => ({ value: item.id, label: item.full_name })),
+      ...analystsProp
+        .filter((item) => item.email === current || !selectedOthers.has(item.email))
+        .map((item) => ({
+          value: item.email,
+          label: `${item.english_name ?? item.email} (${item.email})`,
+        })),
     ];
   }
 
@@ -117,7 +118,7 @@ export function ReviewReportPage({
     if (formAnalysts.length >= 4) return;
     setFormAnalysts((prev) => [
       ...prev,
-      { analyst_id: "", role: prev.length + 1, sort_order: prev.length + 1 },
+      { analyst_email: "", author_order: prev.length + 1 },
     ]);
   }
 
@@ -125,19 +126,19 @@ export function ReviewReportPage({
     setFormAnalysts((prev) =>
       prev
         .filter((_, idx) => idx !== index)
-        .map((item, idx) => ({ ...item, role: idx + 1, sort_order: idx + 1 }))
+        .map((item, idx) => ({ ...item, author_order: idx + 1 }))
     );
   }
 
-  function updateAnalyst(index: number, analystId: string) {
+  function updateAnalyst(index: number, analystEmail: string) {
     setFormAnalysts((prev) => {
       const next = [...prev];
-      next[index] = { ...next[index], analyst_id: analystId };
+      next[index] = { ...next[index], analyst_email: analystEmail };
       return next;
     });
   }
 
-  async function handleDownload(filePath: string, fileName?: string) {
+  async function handleDownload(filePath: string, _fileName?: string) {
     if (!detail) {
       return;
     }
@@ -155,41 +156,34 @@ export function ReviewReportPage({
     window.open(result.data, "_blank", "noopener,noreferrer");
   }
 
-  async function uploadReportFiles(params: {
-    reportId: string;
-    versionNo: number;
-  }): Promise<{
-    word_file_path: string | null;
-    word_file_name: string | null;
-    pdf_file_path: string | null;
-    pdf_file_name: string | null;
+  async function uploadReportFiles(): Promise<{
+    word_path: string | null;
+    pdf_path: string | null;
+    model_path: string | null;
   }> {
-    let wordFilePath: string | null = detail?.latest_version?.word_file_path ?? null;
-    let wordFileName: string | null = detail?.latest_version?.word_file_name ?? null;
-    let pdfFilePath: string | null = detail?.latest_version?.pdf_file_path ?? null;
-    let pdfFileName: string | null = detail?.latest_version?.pdf_file_name ?? null;
+    let wordPath: string | null = detail?.word_path ?? null;
+    let pdfPath: string | null = detail?.pdf_path ?? null;
+    const modelPath: string | null = detail?.model_path ?? null;
 
     // Upload Word/PPT file
     if (reportFile) {
       const check = validateWordPptExtension(reportFile.name);
       if (!check.ok) {
         toast.error(check.error, { title: "Validation Error" });
-        return { word_file_path: null, word_file_name: null, pdf_file_path: null, pdf_file_name: null };
+        return { word_path: null, pdf_path: null, model_path: null };
       }
 
       const fd = new FormData();
       fd.append("file", reportFile);
-      fd.append("reportId", params.reportId);
-      fd.append("versionNo", String(params.versionNo));
+      fd.append("reportId", detail!.id);
       fd.append("label", "report");
 
       const result = await uploadReportFileAction(fd);
       if (!result.ok) {
         toast.error(result.error, { title: "Upload Error" });
-        return { word_file_path: null, word_file_name: null, pdf_file_path: null, pdf_file_name: null };
+        return { word_path: null, pdf_path: null, model_path: null };
       }
-      wordFilePath = result.file_path;
-      wordFileName = reportFile.name;
+      wordPath = result.file_path;
     }
 
     // Upload PDF file
@@ -197,29 +191,26 @@ export function ReviewReportPage({
       const check = validatePdfExtension(pdfFile.name);
       if (!check.ok) {
         toast.error(check.error, { title: "Validation Error" });
-        return { word_file_path: null, word_file_name: null, pdf_file_path: null, pdf_file_name: null };
+        return { word_path: null, pdf_path: null, model_path: null };
       }
 
       const fd = new FormData();
       fd.append("file", pdfFile);
-      fd.append("reportId", params.reportId);
-      fd.append("versionNo", String(params.versionNo));
+      fd.append("reportId", detail!.id);
       fd.append("label", "report-pdf");
 
       const result = await uploadReportFileAction(fd);
       if (!result.ok) {
         toast.error(result.error, { title: "Upload Error" });
-        return { word_file_path: null, word_file_name: null, pdf_file_path: null, pdf_file_name: null };
+        return { word_path: null, pdf_path: null, model_path: null };
       }
-      pdfFilePath = result.file_path;
-      pdfFileName = pdfFile.name;
+      pdfPath = result.file_path;
     }
 
     return {
-      word_file_path: wordFilePath,
-      word_file_name: wordFileName,
-      pdf_file_path: pdfFilePath,
-      pdf_file_name: pdfFileName,
+      word_path: wordPath,
+      pdf_path: pdfPath,
+      model_path: modelPath,
     };
   }
 
@@ -228,25 +219,38 @@ export function ReviewReportPage({
       return;
     }
 
-    // 验证 Approve 操作必须上传 PDF 文件
+    // Approve requires PDF
     if (action === "approve") {
       const hasNewPdfFile = pdfFile !== null;
-      const hasExistingPdfFile = !!detail.latest_version?.pdf_file_path;
+      const hasExistingPdfFile = !!detail.pdf_path;
 
       if (!hasNewPdfFile && !hasExistingPdfFile) {
-        toast.error("Approve requires a PDF report file to be uploaded.", { title: "Validation Error" });
+        toast.error("Approve requires a PDF report file to be uploaded.", {
+          title: "Validation Error",
+        });
         return;
       }
     }
 
     setActionLoading(true);
 
-    // 保存修改（如果有修改的话）
-    if (reportFile || pdfFile || formTitle !== detail.title || formInvestmentThesis !== (detail.investment_thesis ?? "")) {
-      const uploadResult = await uploadReportFiles({
-        reportId: detail.id,
-        versionNo: detail.current_version_no + 1,
-      });
+    // Save changes if any
+    const hasChanges =
+      reportFile ||
+      pdfFile ||
+      formTitle !== detail.title ||
+      formInvestmentThesis !== (detail.investment_thesis ?? "");
+
+    if (hasChanges) {
+      const uploadResult = await uploadReportFiles();
+      if (
+        uploadResult.word_path === null &&
+        uploadResult.pdf_path === null &&
+        (reportFile || pdfFile)
+      ) {
+        setActionLoading(false);
+        return;
+      }
 
       const saveResult = await saveReviewReportAction({
         report_id: detail.id,
@@ -258,19 +262,13 @@ export function ReviewReportPage({
         region_code: detail.region_code,
         sector_id: detail.sector_id,
         report_language: detail.report_language,
-        contact_person_id: detail.contact_person_id,
+        contact_person: detail.contact_person,
         investment_thesis: formInvestmentThesis || null,
-        certificate_confirmed: detail.certificate_confirmed,
         coverage_id: detail.coverage_id,
-        analysts: formAnalysts.map((a) => ({
-          analyst_id: a.analyst_id,
-          role: a.role,
-          sort_order: a.sort_order,
-        })),
-        word_file_path: uploadResult.word_file_path,
-        word_file_name: uploadResult.word_file_name,
-        pdf_file_path: uploadResult.pdf_file_path,
-        pdf_file_name: uploadResult.pdf_file_name,
+        analysts: formAnalysts,
+        word_path: uploadResult.word_path,
+        pdf_path: uploadResult.pdf_path,
+        model_path: uploadResult.model_path,
       });
 
       if (!saveResult.ok) {
@@ -335,8 +333,18 @@ export function ReviewReportPage({
           <div className="flex items-center gap-4">
             <Link href="/report-review">
               <Button type="button" variant="ghost">
-                <svg className="mr-2 h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
+                <svg
+                  className="mr-2 h-4 w-4"
+                  fill="none"
+                  stroke="currentColor"
+                  viewBox="0 0 24 24"
+                >
+                  <path
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                    strokeWidth={2}
+                    d="M15 19l-7-7 7-7"
+                  />
                 </svg>
                 Back
               </Button>
@@ -357,53 +365,80 @@ export function ReviewReportPage({
             Report Information
           </h2>
           <div className="space-y-4">
-            <Textarea
+            <Input
               label="Title"
               value={formTitle}
               onChange={(e) => setFormTitle(e.target.value)}
-              rows={3}
             />
           </div>
           <div className="mt-4 grid grid-cols-1 gap-4 md:grid-cols-2">
             <div>
               <span className="text-sm text-[var(--fg-tertiary)]">Type:</span>
-              <span className="ml-2 text-sm text-[var(--fg-primary)]">{detail?.report_type}</span>
+              <span className="ml-2 text-sm text-[var(--fg-primary)]">
+                {detail?.report_type}
+              </span>
             </div>
             {detail?.ticker && (
               <div>
-                <span className="text-sm text-[var(--fg-tertiary)]">Ticker:</span>
-                <span className="ml-2 text-sm text-[var(--fg-primary)]">{detail.ticker}</span>
+                <span className="text-sm text-[var(--fg-tertiary)]">
+                  Ticker:
+                </span>
+                <span className="ml-2 text-sm text-[var(--fg-primary)]">
+                  {detail.ticker}
+                </span>
               </div>
             )}
             {detail?.rating && (
               <div>
-                <span className="text-sm text-[var(--fg-tertiary)]">Rating:</span>
-                <span className="ml-2 text-sm text-[var(--fg-primary)]">{detail.rating}</span>
+                <span className="text-sm text-[var(--fg-tertiary)]">
+                  Rating:
+                </span>
+                <span className="ml-2 text-sm text-[var(--fg-primary)]">
+                  {detail.rating}
+                </span>
               </div>
             )}
             {detail?.target_price && (
               <div>
-                <span className="text-sm text-[var(--fg-tertiary)]">Target Price:</span>
-                <span className="ml-2 text-sm text-[var(--fg-primary)]">{detail.target_price}</span>
+                <span className="text-sm text-[var(--fg-tertiary)]">
+                  Target Price:
+                </span>
+                <span className="ml-2 text-sm text-[var(--fg-primary)]">
+                  {detail.target_price}
+                </span>
               </div>
             )}
             {detail.region && (
               <div>
-                <span className="text-sm text-[var(--fg-tertiary)]">Region:</span>
-                <span className="ml-2 text-sm text-[var(--fg-primary)]">{detail.region.name_en}</span>
+                <span className="text-sm text-[var(--fg-tertiary)]">
+                  Region:
+                </span>
+                <span className="ml-2 text-sm text-[var(--fg-primary)]">
+                  {detail.region.name_en}
+                </span>
               </div>
             )}
             {detail.sector && (
               <div>
-                <span className="text-sm text-[var(--fg-tertiary)]">Sector:</span>
-                <span className="ml-2 text-sm text-[var(--fg-primary)]">{detail.sector.name_en}</span>
+                <span className="text-sm text-[var(--fg-tertiary)]">
+                  Sector:
+                </span>
+                <span className="ml-2 text-sm text-[var(--fg-primary)]">
+                  {detail.sector.name_en}
+                </span>
               </div>
             )}
             {detail.report_language && (
               <div>
-                <span className="text-sm text-[var(--fg-tertiary)]">Language:</span>
+                <span className="text-sm text-[var(--fg-tertiary)]">
+                  Language:
+                </span>
                 <span className="ml-2 text-sm text-[var(--fg-primary)]">
-                  {detail.report_language === "en" ? "English" : detail.report_language === "zh" ? "Chinese" : detail.report_language}
+                  {detail.report_language === "en"
+                    ? "English"
+                    : detail.report_language === "zh"
+                      ? "Chinese"
+                      : detail.report_language}
                 </span>
               </div>
             )}
@@ -411,8 +446,12 @@ export function ReviewReportPage({
 
           {detail.coverage && (
             <div className="mt-4">
-              <span className="text-sm text-[var(--fg-tertiary)]">Coverage:</span>
-              <span className="ml-2 text-sm text-[var(--fg-primary)]">{detail.coverage.english_full_name}</span>
+              <span className="text-sm text-[var(--fg-tertiary)]">
+                Coverage:
+              </span>
+              <span className="ml-2 text-sm text-[var(--fg-primary)]">
+                {detail.coverage.english_name}
+              </span>
             </div>
           )}
 
@@ -431,14 +470,21 @@ export function ReviewReportPage({
               Analysts
             </div>
             {formAnalysts.length === 0 ? (
-              <p className="text-sm text-[var(--fg-tertiary)]">No analyst assigned.</p>
+              <p className="text-sm text-[var(--fg-tertiary)]">
+                No analyst assigned.
+              </p>
             ) : (
               formAnalysts.map((item, index) => (
-                <div key={`${item.analyst_id}-${index}`} className="mb-2 grid grid-cols-12 gap-2">
+                <div
+                  key={`${item.analyst_email}-${index}`}
+                  className="mb-2 grid grid-cols-12 gap-2"
+                >
                   <div className="col-span-9">
                     <Select
-                      value={item.analyst_id}
-                      onChange={(e) => updateAnalyst(index, e.target.value)}
+                      value={item.analyst_email}
+                      onChange={(e) =>
+                        updateAnalyst(index, e.target.value)
+                      }
                       options={getAnalystOptions(index)}
                     />
                   </div>
@@ -459,7 +505,12 @@ export function ReviewReportPage({
               ))
             )}
             {formAnalysts.length < 4 && (
-              <Button type="button" variant="secondary" onClick={addAnalyst} className="mt-2">
+              <Button
+                type="button"
+                variant="secondary"
+                onClick={addAnalyst}
+                className="mt-2"
+              >
                 Add Analyst
               </Button>
             )}
@@ -472,63 +523,134 @@ export function ReviewReportPage({
             Report Files
           </h2>
           <div className="space-y-4">
-            {/* Report File (Word/PPT) - show saved or newly selected */}
-            {(detail.latest_version?.word_file_path || reportFile) ? (
+            {/* Report File - show saved or newly selected */}
+            {(detail.word_path || reportFile) ? (
               <div className="rounded-[8px] border border-[var(--border-subtle)] bg-[var(--bg-surface-hover)]/40 p-3">
                 {reportFile ? (
                   <div className="flex items-center gap-2 text-sm text-green-600">
-                    <svg className="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
+                    <svg
+                      className="h-4 w-4"
+                      fill="none"
+                      stroke="currentColor"
+                      viewBox="0 0 24 24"
+                    >
+                      <path
+                        strokeLinecap="round"
+                        strokeLinejoin="round"
+                        strokeWidth={2}
+                        d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"
+                      />
                     </svg>
                     Selected: {reportFile.name}
                   </div>
-                ) : detail.latest_version?.word_file_path ? (
+                ) : detail.word_path ? (
                   <button
                     type="button"
                     className="flex items-center gap-2 text-sm text-blue-500 hover:underline"
                     onClick={() =>
                       handleDownload(
-                        detail.latest_version!.word_file_path!,
-                        detail.latest_version!.word_file_name ?? "report",
+                        detail.word_path!,
+                        detail.word_path!.split("/").pop() ?? "report",
                       )
                     }
                   >
-                    <svg className="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+                    <svg
+                      className="h-4 w-4"
+                      fill="none"
+                      stroke="currentColor"
+                      viewBox="0 0 24 24"
+                    >
+                      <path
+                        strokeLinecap="round"
+                        strokeLinejoin="round"
+                        strokeWidth={2}
+                        d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"
+                      />
                     </svg>
-                    Report (Word/PPT) : {detail.latest_version.word_file_name ?? "Unknown"}
+                    Report File
                   </button>
                 ) : null}
               </div>
             ) : null}
 
             {/* PDF File - show saved or newly selected */}
-            {(detail.latest_version?.pdf_file_path || pdfFile) ? (
+            {(detail.pdf_path || pdfFile) ? (
               <div className="rounded-[8px] border border-[var(--border-subtle)] bg-[var(--bg-surface-hover)]/40 p-3">
                 {pdfFile ? (
                   <div className="flex items-center gap-2 text-sm text-green-600">
-                    <svg className="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
+                    <svg
+                      className="h-4 w-4"
+                      fill="none"
+                      stroke="currentColor"
+                      viewBox="0 0 24 24"
+                    >
+                      <path
+                        strokeLinecap="round"
+                        strokeLinejoin="round"
+                        strokeWidth={2}
+                        d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"
+                      />
                     </svg>
                     Selected: {pdfFile.name}
                   </div>
-                ) : detail.latest_version?.pdf_file_path ? (
+                ) : detail.pdf_path ? (
                   <button
                     type="button"
                     className="flex items-center gap-2 text-sm text-blue-500 hover:underline"
                     onClick={() =>
                       handleDownload(
-                        detail.latest_version!.pdf_file_path!,
-                        detail.latest_version!.pdf_file_name ?? "report.pdf",
+                        detail.pdf_path!,
+                        detail.pdf_path!.split("/").pop() ?? "report.pdf",
                       )
                     }
                   >
-                    <svg className="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+                    <svg
+                      className="h-4 w-4"
+                      fill="none"
+                      stroke="currentColor"
+                      viewBox="0 0 24 24"
+                    >
+                      <path
+                        strokeLinecap="round"
+                        strokeLinejoin="round"
+                        strokeWidth={2}
+                        d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"
+                      />
                     </svg>
-                    Report Pdf (PDF) : {detail.latest_version.pdf_file_name ?? "Unknown"}
+                    PDF File
                   </button>
                 ) : null}
+              </div>
+            ) : null}
+
+            {/* Existing Model File */}
+            {detail.model_path ? (
+              <div className="rounded-[8px] border border-[var(--border-subtle)] bg-[var(--bg-surface-hover)]/40 p-3">
+                <button
+                  type="button"
+                  className="flex items-center gap-2 text-sm text-blue-500 hover:underline"
+                  onClick={() =>
+                    handleDownload(
+                      detail.model_path!,
+                      detail.model_path!.split("/").pop() ?? "model",
+                    )
+                  }
+                >
+                  <svg
+                    className="h-4 w-4"
+                    fill="none"
+                    stroke="currentColor"
+                    viewBox="0 0 24 24"
+                  >
+                    <path
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                      strokeWidth={2}
+                      d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"
+                    />
+                  </svg>
+                  Model File
+                </button>
               </div>
             ) : null}
 
@@ -548,27 +670,6 @@ export function ReviewReportPage({
               hint="Supports .pdf"
             />
 
-            {/* Existing Model File */}
-            {detail.latest_version?.model_file_path ? (
-              <div className="rounded-[8px] border border-[var(--border-subtle)] bg-[var(--bg-surface-hover)]/40 p-3">
-                <button
-                  type="button"
-                  className="flex items-center gap-2 text-sm text-blue-500 hover:underline"
-                  onClick={() =>
-                    handleDownload(
-                      detail.latest_version!.model_file_path!,
-                      detail.latest_version!.model_file_name ?? "model",
-                    )
-                  }
-                >
-                  <svg className="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
-                  </svg>
-                  Model : {detail.latest_version.model_file_name ?? "Unknown"}
-                </button>
-              </div>
-            ) : null}
-
             <FileDropzone
               label="Model File"
               accept=".xls,.xlsx,.csv"
@@ -579,76 +680,7 @@ export function ReviewReportPage({
           </div>
         </section>
 
-        {/* Version History Section */}
-        <section className="rounded-[12px] border border-[var(--border-subtle)] bg-[var(--bg-surface)]/70 p-5">
-          <h2 className="mb-4 text-sm font-semibold uppercase tracking-wider text-[var(--fg-secondary)]">
-            Report Version History
-          </h2>
-          {detail.versions.length === 0 ? (
-            <p className="text-sm text-[var(--fg-tertiary)]">No versions yet.</p>
-          ) : (
-            <div className="space-y-2">
-              {detail.versions.map((item) => (
-                <div
-                  key={item.id}
-                  className="rounded-[8px] border border-[var(--border-subtle)] bg-[var(--bg-surface-hover)]/40 p-3 text-sm"
-                >
-                  <div className="flex items-center gap-2 text-[var(--fg-primary)]">
-                    <span className="rounded bg-zinc-600 px-2 py-0.5 text-xs text-white">
-                      v{item.version_no}
-                    </span>
-                    <span>Changed by {item.changed_by_name ?? `${item.changed_by.slice(0, 8)}...`}</span>
-                  </div>
-                  <div className="mt-1 text-xs text-[var(--fg-tertiary)]">
-                    {formatDateTime(item.changed_at)}
-                  </div>
-                  {item.word_file_path || item.pdf_file_path || item.model_file_path ? (
-                    <div className="mt-2 space-y-1">
-                      {item.word_file_path ? (
-                        <button
-                          type="button"
-                          className="flex items-center gap-1 text-xs text-blue-500 hover:underline"
-                          onClick={() => handleDownload(item.word_file_path!, item.word_file_name ?? "report")}
-                        >
-                          <svg className="h-3 w-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
-                          </svg>
-                          {item.word_file_name ?? "Report File (Word/PPT)"}
-                        </button>
-                      ) : null}
-                      {item.pdf_file_path ? (
-                        <button
-                          type="button"
-                          className="flex items-center gap-1 text-xs text-blue-500 hover:underline"
-                          onClick={() => handleDownload(item.pdf_file_path!, item.pdf_file_name ?? "report.pdf")}
-                        >
-                          <svg className="h-3 w-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
-                          </svg>
-                          {item.pdf_file_name ?? "Report Pdf (PDF)"}
-                        </button>
-                      ) : null}
-                      {item.model_file_path ? (
-                        <button
-                          type="button"
-                          className="flex items-center gap-1 text-xs text-blue-500 hover:underline"
-                          onClick={() => handleDownload(item.model_file_path!, item.model_file_name ?? "model")}
-                        >
-                          <svg className="h-3 w-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
-                          </svg>
-                          {item.model_file_name ?? "Model File"}
-                        </button>
-                      ) : null}
-                    </div>
-                  ) : null}
-                </div>
-              ))}
-            </div>
-          )}
-        </section>
-
-        {/* Status History Section */}
+        {/* Status History Section (no version history) */}
         <section className="rounded-[12px] border border-[var(--border-subtle)] bg-[var(--bg-surface)]/70 p-5">
           <h2 className="mb-4 text-sm font-semibold uppercase tracking-wider text-[var(--fg-secondary)]">
             Report Status History
@@ -666,57 +698,15 @@ export function ReviewReportPage({
                     <span>{item.from_status}</span>
                     <span className="text-[var(--fg-tertiary)]">-&gt;</span>
                     <span>{item.to_status}</span>
-                    <span className="rounded bg-zinc-600 px-2 py-0.5 text-xs text-white">
-                      v{item.version_no}
-                    </span>
                   </div>
                   <div className="mt-1 text-xs text-[var(--fg-tertiary)]">
                     {formatDateTime(item.action_at)} by{" "}
-                    {item.action_by_name ?? `${item.action_by.slice(0, 8)}...`}
+                    {item.action_by_name ??
+                      `${item.action_by.slice(0, 8)}...`}
                   </div>
                   {item.reason ? (
                     <div className="mt-1 text-xs text-amber-300">
                       Note: {item.reason}
-                    </div>
-                  ) : null}
-                  {item.word_file_path || item.pdf_file_path || item.model_file_path ? (
-                    <div className="mt-2 space-y-1">
-                      {item.word_file_path ? (
-                        <button
-                          type="button"
-                          className="flex items-center gap-1 text-xs text-blue-500 hover:underline"
-                          onClick={() => handleDownload(item.word_file_path!, item.word_file_name ?? "report")}
-                        >
-                          <svg className="h-3 w-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
-                          </svg>
-                          {item.word_file_name ?? "Report File (Word/PPT)"}
-                        </button>
-                      ) : null}
-                      {item.pdf_file_path ? (
-                        <button
-                          type="button"
-                          className="flex items-center gap-1 text-xs text-blue-500 hover:underline"
-                          onClick={() => handleDownload(item.pdf_file_path!, item.pdf_file_name ?? "report.pdf")}
-                        >
-                          <svg className="h-3 w-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
-                          </svg>
-                          {item.pdf_file_name ?? "Report Pdf (PDF)"}
-                        </button>
-                      ) : null}
-                      {item.model_file_path ? (
-                        <button
-                          type="button"
-                          className="flex items-center gap-1 text-xs text-blue-500 hover:underline"
-                          onClick={() => handleDownload(item.model_file_path!, item.model_file_name ?? "model")}
-                        >
-                          <svg className="h-3 w-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
-                          </svg>
-                          {item.model_file_name ?? "Model File"}
-                        </button>
-                      ) : null}
                     </div>
                   ) : null}
                 </div>

@@ -1,0 +1,2 @@
+INSERT INTO "kong"."targets" ("id", "created_at", "upstream_id", "target", "weight", "tags", "ws_id", "cache_key", "updated_at") VALUES 
+('d3afa28e-e1a5-48fa-99f2-9f4cb1adac1c', '2026-04-07 14:08:41.603+08', 'c690a0d1-182c-41a2-a97d-99e8a915d281', 'localhost:4001', '100', null, '0822c026-e528-49e3-bf0a-377b174a9529', 'targets:c690a0d1-182c-41a2-a97d-99e8a915d281:localhost:4001::::0822c026-e528-49e3-bf0a-377b174a9529', '2026-04-07 14:08:41.603+08');

@@ -1,0 +1,1 @@
+ALTER TABLE "_analytics"."payment_methods" ADD CONSTRAINT "payment_methods_pkey" PRIMARY KEY (id);

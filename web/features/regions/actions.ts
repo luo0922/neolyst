@@ -62,7 +62,7 @@ export async function createRegionAction(
  * Update an existing region
  */
 export async function updateRegionAction(
-  id: string,
+  code: string,
   input: unknown,
 ): Promise<Result<Region>> {
   await requireAdminOrThrow();
@@ -72,7 +72,7 @@ export async function updateRegionAction(
     return err(parsed.error.issues[0]?.message ?? "Invalid input.");
   }
 
-  const result = await updateRegionRepo(id, parsed.data);
+  const result = await updateRegionRepo(code, parsed.data);
   if (result.ok) {
     revalidatePath("/regions");
   }
@@ -82,10 +82,10 @@ export async function updateRegionAction(
 /**
  * Delete a region
  */
-export async function deleteRegionAction(id: string): Promise<Result<null>> {
+export async function deleteRegionAction(code: string): Promise<Result<null>> {
   await requireAdminOrThrow();
 
-  const result = await deleteRegionRepo(id);
+  const result = await deleteRegionRepo(code);
   if (!result.ok) {
     return result;
   }

@@ -1,0 +1,1 @@
+ALTER TABLE "mem0_graph"."_ag_label_edge" ADD CONSTRAINT "_ag_label_edge_pkey" PRIMARY KEY (id);

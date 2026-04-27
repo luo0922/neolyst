@@ -1,0 +1,1 @@
+ALTER TABLE "storage"."prefixes" ADD CONSTRAINT "prefixes_pkey" PRIMARY KEY (bucket_id, level, name);

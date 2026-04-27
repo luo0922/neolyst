@@ -1,0 +1,1 @@
+ALTER TABLE "kong"."response_ratelimiting_metrics" ADD CONSTRAINT "response_ratelimiting_metrics_pkey" PRIMARY KEY (identifier, period, period_date, service_id, route_id);

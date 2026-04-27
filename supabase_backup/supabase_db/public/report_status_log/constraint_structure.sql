@@ -1,0 +1,5 @@
+ALTER TABLE "public"."report_status_log" ADD CONSTRAINT "report_status_log_from_status_check" CHECK ((from_status = ANY (ARRAY['draft'::text, 'submitted'::text, 'published'::text, 'rejected'::text])));
+ALTER TABLE "public"."report_status_log" ADD CONSTRAINT "report_status_log_pkey" PRIMARY KEY (id);
+ALTER TABLE "public"."report_status_log" ADD CONSTRAINT "report_status_log_reject_reason_required" CHECK (((to_status <> 'rejected'::text) OR ((reason IS NOT NULL) AND (btrim(reason) <> ''::text))));
+ALTER TABLE "public"."report_status_log" ADD CONSTRAINT "report_status_log_to_status_check" CHECK ((to_status = ANY (ARRAY['draft'::text, 'submitted'::text, 'published'::text, 'rejected'::text])));
+ALTER TABLE "public"."report_status_log" ADD CONSTRAINT "report_status_log_version_no_check" CHECK ((version_no >= 0));

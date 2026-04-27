@@ -1,0 +1,1 @@
+ALTER TABLE "supabase_functions"."migrations" ADD CONSTRAINT "migrations_pkey" PRIMARY KEY (version);

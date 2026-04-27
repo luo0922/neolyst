@@ -1,0 +1,6 @@
+ALTER TABLE "_supavisor"."tenants" ADD CONSTRAINT "auth_query_constraints" CHECK (((require_user = true) OR ((require_user = false) AND (auth_query IS NOT NULL))));
+ALTER TABLE "_supavisor"."tenants" ADD CONSTRAINT "default_pool_strategy_values" CHECK (((default_pool_strategy)::text = ANY ((ARRAY['fifo'::character varying, 'lifo'::character varying])::text[])));
+ALTER TABLE "_supavisor"."tenants" ADD CONSTRAINT "ip_version_values" CHECK (((ip_version)::text = ANY ((ARRAY['auto'::character varying, 'v4'::character varying, 'v6'::character varying])::text[])));
+ALTER TABLE "_supavisor"."tenants" ADD CONSTRAINT "tenants_pkey" PRIMARY KEY (id);
+ALTER TABLE "_supavisor"."tenants" ADD CONSTRAINT "upstream_constraints" CHECK ((((upstream_ssl = false) AND (upstream_verify IS NULL)) OR ((upstream_ssl = true) AND (upstream_verify IS NOT NULL))));
+ALTER TABLE "_supavisor"."tenants" ADD CONSTRAINT "upstream_verify_values" CHECK (((upstream_verify)::text = ANY ((ARRAY['none'::character varying, 'peer'::character varying])::text[])));

@@ -17,7 +17,6 @@ import { err, type Result } from "@/lib/result";
 import { createServiceRoleClient, requireAuth } from "@/lib/supabase/server";
 
 import {
-  changeReportStatus,
   createReport,
   findCoverageByTicker,
   getReportDetail,
@@ -27,9 +26,9 @@ import {
   listReports,
   reportTypeExists,
   regionCodeExists,
-  saveChiefApprove,
   saveReportContent,
   sectorExists,
+  submitReport,
   type ReportDetail,
 } from "./repo/reports-repo";
 
@@ -84,21 +83,10 @@ function resolveOptionalId(
   if (input === undefined) {
     return fallback ?? null;
   }
-  // Treat empty string as null to avoid "Invalid UUID" in RPC calls
   if (input === "" || input === null) {
     return null;
   }
   return input;
-}
-
-function resolveOptionalBoolean(
-  input: boolean | undefined,
-  fallback: boolean | undefined,
-): boolean {
-  if (input === undefined) {
-    return Boolean(fallback);
-  }
-  return Boolean(input);
 }
 
 function isCompanyType(reportType: string): boolean {
@@ -121,8 +109,12 @@ function requiresModel(reportType: string): boolean {
   return reportType === "company";
 }
 
+/**
+ * Validate analysts: check that all analyst_email values exist in active analyst list.
+ * New schema: analyst_email (text) instead of analyst_id (uuid)
+ */
 async function validateAnalysts(
-  input: { analyst_id: string }[],
+  input: { analyst_email: string }[],
 ): Promise<string | null> {
   if (input.length === 0) {
     return null;
@@ -133,8 +125,12 @@ async function validateAnalysts(
     return "Failed to validate analyst list.";
   }
 
-  const activeIds = new Set(analystsResult.data.map((item) => item.id));
-  const hasInvalid = input.some((item) => !activeIds.has(item.analyst_id));
+  const activeEmails = new Set(
+    analystsResult.data.map((item) => item.email.toLowerCase()),
+  );
+  const hasInvalid = input.some(
+    (item) => !activeEmails.has(item.analyst_email.toLowerCase()),
+  );
   if (hasInvalid) {
     return "Analyst must be selected from the active analyst list.";
   }
@@ -199,6 +195,11 @@ async function resolveCoverageIdForDraft(input: {
   return { ok: true, data: coverageResult.data?.id ?? null };
 }
 
+/**
+ * Validate report before submit.
+ * New schema: word_path/pdf_path/model_path directly on report (no version).
+ * certificate_confirmed removed.
+ */
 async function validateReportForSubmit(
   detail: ReportDetail,
 ): Promise<string | null> {
@@ -225,19 +226,13 @@ async function validateReportForSubmit(
   if (!detail.report_language) {
     return "Report language is required.";
   }
-  // Contact Person is optional
-  // if (!trimToNull(detail.contact_person)) {
-  //   return "Contact Person is required.";
-  // }
   if (!trimToNull(detail.investment_thesis)) {
     return "Investment thesis (report abstract) is required.";
   }
   if (detail.analysts.length === 0) {
     return "At least one Analyst is required.";
   }
-  if (!detail.certificate_confirmed) {
-    return "Certificate must be confirmed before submit.";
-  }
+  // certificate_confirmed check removed
 
   if (requiresRegion(detail.report_type) && !detail.region_code) {
     return "Region is required for this Report Type.";
@@ -262,14 +257,12 @@ async function validateReportForSubmit(
     return "Ticker is required for Company Flash report.";
   }
 
-  if (!detail.latest_version?.word_file_path) {
+  // File paths now directly on report (not in latest_version)
+  if (!detail.word_path) {
     return "Report Word file is required before submit.";
   }
 
-  if (
-    requiresModel(detail.report_type) &&
-    !detail.latest_version?.model_file_path
-  ) {
+  if (requiresModel(detail.report_type) && !detail.model_path) {
     return "Company report requires Model file before submit.";
   }
 
@@ -285,14 +278,14 @@ async function validateReportForSubmit(
     if (!coverageResult.data) {
       return "Company-type reports require a valid Coverage. Please complete Coverage maintenance first.";
     }
-    if (coverageResult.data.analyst_ids.length === 0) {
+    if (coverageResult.data.analyst_emails.length === 0) {
       return "Matched Coverage has no Analyst mapping. Please maintain Coverage first.";
     }
-    const reportAnalystIds = new Set(
-      detail.analysts.map((item) => item.analyst_id),
+    const reportAnalystEmails = new Set(
+      detail.analysts.map((item) => item.analyst_email.toLowerCase()),
     );
-    const overlap = coverageResult.data.analyst_ids.some((id) =>
-      reportAnalystIds.has(id),
+    const overlap = coverageResult.data.analyst_emails.some((email) =>
+      reportAnalystEmails.has(email.toLowerCase()),
     );
     if (!overlap) {
       return "Company-type submit requires Coverage relation with matching Analyst assignment.";
@@ -324,6 +317,10 @@ async function assertEditable(
   return detailResult;
 }
 
+/**
+ * Build save payload from input + fallback.
+ * New schema: contact_person (email), no certificate_confirmed, direct file paths.
+ */
 function toSavePayload(input: {
   title: string;
   report_type: string;
@@ -333,17 +330,13 @@ function toSavePayload(input: {
   region_code?: string | null;
   sector_id?: string | null;
   report_language?: ReportLanguage | null;
-  contact_person_id?: string | null;
+  contact_person?: string | null;
   investment_thesis?: string | null;
-  certificate_confirmed?: boolean;
   coverage_id?: string | null;
   analysts: ReportAnalystInput[];
-  word_file_path?: string | null;
-  word_file_name?: string | null;
-  pdf_file_path?: string | null;
-  pdf_file_name?: string | null;
-  model_file_path?: string | null;
-  model_file_name?: string | null;
+  word_path?: string | null;
+  pdf_path?: string | null;
+  model_path?: string | null;
   fallback?: Partial<ReportDetail>;
 }) {
   return {
@@ -361,47 +354,33 @@ function toSavePayload(input: {
       input.report_language === undefined
         ? (input.fallback?.report_language ?? null)
         : (input.report_language ?? null),
-    contact_person_id: resolveOptionalId(
-      input.contact_person_id,
-      input.fallback?.contact_person_id,
+    // contact_person is now analyst email (text), not uuid user id
+    contact_person: resolveOptionalId(
+      input.contact_person,
+      input.fallback?.contact_person,
     ),
     investment_thesis: resolveOptionalText(
       input.investment_thesis,
       input.fallback?.investment_thesis,
-    ),
-    certificate_confirmed: resolveOptionalBoolean(
-      input.certificate_confirmed,
-      input.fallback?.certificate_confirmed,
     ),
     coverage_id: resolveOptionalId(
       input.coverage_id,
       input.fallback?.coverage_id,
     ),
     analysts: input.analysts,
-    word_file_path:
-      input.word_file_path === undefined
-        ? (input.fallback?.latest_version?.word_file_path ?? null)
-        : (input.word_file_path ?? null),
-    word_file_name:
-      input.word_file_name === undefined
-        ? (input.fallback?.latest_version?.word_file_name ?? null)
-        : (input.word_file_name ?? null),
-    pdf_file_path:
-      input.pdf_file_path === undefined
-        ? (input.fallback?.latest_version?.pdf_file_path ?? null)
-        : (input.pdf_file_path ?? null),
-    pdf_file_name:
-      input.pdf_file_name === undefined
-        ? (input.fallback?.latest_version?.pdf_file_name ?? null)
-        : (input.pdf_file_name ?? null),
-    model_file_path:
-      input.model_file_path === undefined
-        ? (input.fallback?.latest_version?.model_file_path ?? null)
-        : (input.model_file_path ?? null),
-    model_file_name:
-      input.model_file_name === undefined
-        ? (input.fallback?.latest_version?.model_file_name ?? null)
-        : (input.model_file_name ?? null),
+    // File paths directly on report
+    word_path:
+      input.word_path === undefined
+        ? (input.fallback?.word_path ?? null)
+        : (input.word_path ?? null),
+    pdf_path:
+      input.pdf_path === undefined
+        ? (input.fallback?.pdf_path ?? null)
+        : (input.pdf_path ?? null),
+    model_path:
+      input.model_path === undefined
+        ? (input.fallback?.model_path ?? null)
+        : (input.model_path ?? null),
   };
 }
 
@@ -435,10 +414,8 @@ export async function listReportsAction(input: {
     return actor;
   }
 
-  const { role } = actor.data;
   const page = Math.max(1, input.page ?? 1);
   const query = input.query ?? null;
-  // Default status: all reports
   const defaultStatus = null;
   const appliedStatus = input.status ?? defaultStatus;
 
@@ -517,6 +494,7 @@ export async function createReportAction(
   });
 
   const createResult = await createReport({
+    report_id: crypto.randomUUID(),
     owner_user_id: user.id,
     title: payload.title,
     report_type: payload.report_type,
@@ -527,9 +505,8 @@ export async function createReportAction(
     coverage_id: payload.coverage_id,
     sector_id: payload.sector_id,
     report_language: payload.report_language,
-    contact_person_id: payload.contact_person_id,
+    contact_person: payload.contact_person,
     investment_thesis: payload.investment_thesis,
-    certificate_confirmed: payload.certificate_confirmed,
     analysts: payload.analysts,
   });
 
@@ -594,12 +571,27 @@ export async function saveReportContentAction(
   const payload = toSavePayload({
     ...parsed.data,
     coverage_id: coverageIdResult.data,
+    fallback: editableResult.data,
   });
 
   const saveResult = await saveReportContent({
     report_id: parsed.data.report_id,
     changed_by: user.id,
-    ...payload,
+    title: payload.title,
+    report_type: payload.report_type,
+    ticker: payload.ticker,
+    rating: payload.rating,
+    target_price: payload.target_price,
+    region_code: payload.region_code,
+    sector_id: payload.sector_id,
+    report_language: payload.report_language,
+    contact_person: payload.contact_person,
+    investment_thesis: payload.investment_thesis,
+    coverage_id: payload.coverage_id,
+    analysts: payload.analysts,
+    word_path: payload.word_path,
+    pdf_path: payload.pdf_path,
+    model_path: payload.model_path,
   });
 
   if (saveResult.ok) {
@@ -648,11 +640,7 @@ export async function submitReportAction(
     return err(submitValidationError);
   }
 
-  const submitResult = await changeReportStatus({
-    report_id: parsed.data.report_id,
-    to_status: "submitted",
-    action_by: user.id,
-  });
+  const submitResult = await submitReport(parsed.data.report_id);
 
   if (submitResult.ok) {
     revalidatePath("/reports");
@@ -711,7 +699,9 @@ export async function directSubmitReportAction(
   let reportId = parsed.data.report_id;
 
   if (!reportId) {
+    reportId = crypto.randomUUID();
     const createResult = await createReport({
+      report_id: reportId,
       owner_user_id: user.id,
       title: payload.title,
       report_type: payload.report_type,
@@ -722,53 +712,80 @@ export async function directSubmitReportAction(
       coverage_id: payload.coverage_id,
       sector_id: payload.sector_id,
       report_language: payload.report_language,
-      contact_person_id: payload.contact_person_id,
+      contact_person: payload.contact_person,
       investment_thesis: payload.investment_thesis,
-      certificate_confirmed: payload.certificate_confirmed,
       analysts: payload.analysts,
     });
 
     if (!createResult.ok) {
       return createResult;
     }
+  } else {
+    const editableResult = await assertEditable(role, user.id, reportId);
+    if (!editableResult.ok) {
+      return editableResult;
+    }
 
-    reportId = createResult.data.id;
+    if (editableResult.data.status !== "draft") {
+      return err("Direct submit only supports draft reports.");
+    }
+
+    const saveResult = await saveReportContent({
+      report_id: reportId,
+      changed_by: user.id,
+      title: payload.title,
+      report_type: payload.report_type,
+      ticker: payload.ticker,
+      rating: payload.rating,
+      target_price: payload.target_price,
+      region_code: payload.region_code,
+      sector_id: payload.sector_id,
+      report_language: payload.report_language,
+      contact_person: payload.contact_person,
+      investment_thesis: payload.investment_thesis,
+      coverage_id: payload.coverage_id,
+      analysts: payload.analysts,
+      word_path: payload.word_path,
+      pdf_path: payload.pdf_path,
+      model_path: payload.model_path,
+    });
+
+    if (!saveResult.ok) {
+      return saveResult;
+    }
+
+    const submitValidationError = await validateReportForSubmit(saveResult.data);
+    if (submitValidationError) {
+      return err(`已保存为 Draft，提交失败：${submitValidationError}`);
+    }
+
+    const submitResult = await submitReport(reportId);
+    if (!submitResult.ok) {
+      return err("已保存为 Draft，提交失败");
+    }
+
+    revalidatePath("/reports");
+    revalidatePath("/report-review");
+    revalidatePath("/reports/new");
+    return submitResult;
   }
 
-  const editableResult = await assertEditable(role, user.id, reportId);
-  if (!editableResult.ok) {
-    return editableResult;
-  }
-
-  if (editableResult.data.status !== "draft") {
-    return err("Direct submit only supports draft reports.");
-  }
-
-  const saveResult = await saveReportContent({
-    report_id: reportId,
-    changed_by: user.id,
-    ...toSavePayload({
-      ...parsed.data,
-      coverage_id: coverageIdResult.data,
-      fallback: editableResult.data,
-    }),
-  });
-
-  if (!saveResult.ok) {
-    return saveResult;
-  }
-
-  const submitValidationError = await validateReportForSubmit(saveResult.data);
+  const submitValidationError = await validateReportForSubmit({
+    ...payload,
+    id: reportId,
+    owner_user_id: user.id,
+    status: "draft" as ReportStatus,
+    analysts: payload.analysts,
+    lead_analyst_email: "",
+    analyst_emails: [],
+    created_at: "",
+    updated_at: "",
+  } as unknown as ReportDetail);
   if (submitValidationError) {
     return err(`已保存为 Draft，提交失败：${submitValidationError}`);
   }
 
-  const submitResult = await changeReportStatus({
-    report_id: reportId,
-    to_status: "submitted",
-    action_by: user.id,
-  });
-
+  const submitResult = await submitReport(reportId);
   if (!submitResult.ok) {
     return err("已保存为 Draft，提交失败");
   }
@@ -795,29 +812,15 @@ export async function getReportDownloadUrlAction(
   return getReportDownloadUrl(parsed.data);
 }
 
-export async function saveChiefApproveAction(input: {
-  report_id: string;
-  file_path: string;
-  file_name: string;
-  file_type: string;
-}): Promise<Result<{ id: string }>> {
-  const actor = await getActor();
-  if (!actor.ok) {
-    return actor;
-  }
-
-  return saveChiefApprove({
-    report_id: input.report_id,
-    file_path: input.file_path,
-    file_name: input.file_name,
-    file_type: input.file_type,
-  });
-}
-
 export type StorageUploadResult =
   | { ok: true; file_path: string }
   | { ok: false; error: string };
 
+/**
+ * Upload report file to storage.
+ * New schema: no version numbers. Path format: reports/{reportId}/{category}/{timestamp}_{filename}
+ * chief-approval label removed.
+ */
 export async function uploadReportFileAction(
   formData: FormData,
 ): Promise<StorageUploadResult> {
@@ -841,16 +844,9 @@ export async function uploadReportFileAction(
   const safeName = file.name.replace(/[^a-zA-Z0-9._-]/g, "_");
   const timestamp = new Date().toISOString().replace(/[:.]/g, "-");
 
-  let filePath: string;
-  if (label === "chief-approval") {
-    // Chief approval: ${reportId}/chief-approval/${timestamp}_${safeName}
-    filePath = `${reportId}/chief-approval/${timestamp}_${safeName}`;
-  } else {
-    // Regular report file: ${reportId}/${reportId}_${versionNo3}_${label}_${timestamp}_${safeName}
-    const versionNo = parseInt(formData.get("versionNo") as string, 10);
-    const versionNo3 = String(isNaN(versionNo) ? 1 : versionNo).padStart(3, "0");
-    filePath = `${reportId}/${reportId}_${versionNo3}_${label}_${timestamp}_${safeName}`;
-  }
+  // Path format: reports/{reportId}/{label}/{timestamp}_{filename}
+  // Valid labels: "report", "report-pdf", "model"
+  const filePath = `reports/${reportId}/${label}/${timestamp}_${safeName}`;
 
   const supabase = createServiceRoleClient();
   const arrayBuffer = await file.arrayBuffer();

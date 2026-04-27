@@ -1,0 +1,1 @@
+ALTER TABLE "_analytics"."vercel_auths" ADD CONSTRAINT "vercel_auths_user_id_fkey" FOREIGN KEY (user_id) REFERENCES _analytics.users(id) ON DELETE CASCADE;

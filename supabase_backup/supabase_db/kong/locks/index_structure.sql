@@ -1,0 +1,1 @@
+CREATE INDEX "locks_ttl_idx" ON "kong"."locks" (ttl);

@@ -1,0 +1,1 @@
+ALTER TABLE "dataset_0aece77c_f8b8_484a_8322_78b538ecc038_vector"."lightrag_doc_chunks" ADD CONSTRAINT "lightrag_doc_chunks_pk" PRIMARY KEY (workspace, id);

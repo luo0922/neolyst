@@ -1,0 +1,1 @@
+ALTER TABLE "cron"."job_run_details" ADD CONSTRAINT "job_run_details_pkey" PRIMARY KEY (runid);

@@ -1,0 +1,1 @@
+ALTER TABLE "kong"."cluster_events" ADD CONSTRAINT "cluster_events_pkey" PRIMARY KEY (id);

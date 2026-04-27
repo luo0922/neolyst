@@ -1,0 +1,21 @@
+CREATE TABLE IF NOT EXISTS "_analytics"."endpoint_queries"(
+ "id" bigserial   NOT NULL ,
+ "name" character varying(255)   ,
+ "token" uuid   ,
+ "query" text   ,
+ "user_id" bigint   ,
+ "inserted_at" timestamp(0) without time zone   NOT NULL ,
+ "updated_at" timestamp(0) without time zone   NOT NULL ,
+ "source_mapping" jsonb  DEFAULT '{}'::jsonb   NOT NULL ,
+ "sandboxable" boolean  DEFAULT false   ,
+ "cache_duration_seconds" integer  DEFAULT 3600   ,
+ "proactive_requerying_seconds" integer  DEFAULT 1800   ,
+ "max_limit" integer  DEFAULT 1000   ,
+ "enable_auth" boolean  DEFAULT false   ,
+ "language" character varying(255)   NOT NULL ,
+ "description" character varying(255)   ,
+ "sandbox_query_id" bigint   ,
+ "labels" text   ,
+ "backend_id" bigint   ,
+ "redact_pii" boolean  DEFAULT false   NOT NULL 
+);

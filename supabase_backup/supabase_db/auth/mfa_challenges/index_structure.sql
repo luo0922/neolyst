@@ -1,0 +1,2 @@
+ALTER TABLE "auth"."mfa_challenges" ADD CONSTRAINT "mfa_challenges_auth_factor_id_fkey" FOREIGN KEY (factor_id) REFERENCES auth.mfa_factors(id) ON DELETE CASCADE;
+CREATE INDEX "mfa_challenge_created_at_idx" ON "auth"."mfa_challenges" (created_at);

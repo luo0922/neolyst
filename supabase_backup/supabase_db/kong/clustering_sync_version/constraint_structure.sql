@@ -1,0 +1,1 @@
+ALTER TABLE "kong"."clustering_sync_version" ADD CONSTRAINT "clustering_sync_version_pkey" PRIMARY KEY (version);

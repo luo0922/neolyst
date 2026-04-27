@@ -1,0 +1,11 @@
+ALTER TABLE "public"."report" ADD CONSTRAINT "report_contact_person_id_fkey" FOREIGN KEY (contact_person_id) REFERENCES auth.users(id) ON DELETE SET NULL;
+ALTER TABLE "public"."report" ADD CONSTRAINT "report_coverage_id_fkey" FOREIGN KEY (coverage_id) REFERENCES coverage(id) ON DELETE SET NULL;
+ALTER TABLE "public"."report" ADD CONSTRAINT "report_owner_user_id_fkey" FOREIGN KEY (owner_user_id) REFERENCES auth.users(id) ON DELETE RESTRICT;
+ALTER TABLE "public"."report" ADD CONSTRAINT "report_published_by_fkey" FOREIGN KEY (published_by) REFERENCES auth.users(id) ON DELETE SET NULL;
+ALTER TABLE "public"."report" ADD CONSTRAINT "report_region_code_fkey" FOREIGN KEY (region_code) REFERENCES region(code) ON DELETE SET NULL;
+ALTER TABLE "public"."report" ADD CONSTRAINT "report_sector_id_fkey" FOREIGN KEY (sector_id) REFERENCES sector(id) ON DELETE SET NULL;
+CREATE INDEX "idx_report_updated_at_desc" ON "public"."report" (updated_at);
+CREATE INDEX "idx_report_status" ON "public"."report" (status);
+CREATE INDEX "idx_report_owner" ON "public"."report" (owner_user_id);
+CREATE INDEX "idx_report_created_at_desc" ON "public"."report" (created_at);
+CREATE INDEX "idx_report_contact_person_id" ON "public"."report" (contact_person_id);

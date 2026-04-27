@@ -1,0 +1,2 @@
+CREATE INDEX "ratelimiting_metrics_ttl_idx" ON "kong"."ratelimiting_metrics" (ttl);
+CREATE INDEX "ratelimiting_metrics_idx" ON "kong"."ratelimiting_metrics" (service_id, route_id, period_date, period);

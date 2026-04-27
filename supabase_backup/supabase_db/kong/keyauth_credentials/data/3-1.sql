@@ -1,0 +1,4 @@
+INSERT INTO "kong"."keyauth_credentials" ("id", "created_at", "consumer_id", "key", "tags", "ttl", "ws_id") VALUES 
+('3cece47d-2c6c-42f3-b217-e69158101752', '2026-04-07 14:08:41+08', 'e3ceec06-9aee-47f5-95aa-440452e88af4', 'eyJ0eXAiOiJKV1QiLCJhbGciOiJIUzI1NiJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJvbGUiOiJhbm9uIiwiaWF0IjoxNzczODIzMzkyLCJleHAiOjEzMjg0NDYzMzkyfQ.eDqmk7e2Dm3nQQ5IenuUnobMdhPhkzj9D3f8vbK0_gI', null, null, '0822c026-e528-49e3-bf0a-377b174a9529');
+INSERT INTO "kong"."keyauth_credentials" ("id", "created_at", "consumer_id", "key", "tags", "ttl", "ws_id") VALUES 
+('e3d69e5c-492c-4243-b5e7-9ae6e691f287', '2026-04-07 14:08:41+08', 'd56ae9ab-57bf-4ad5-9aa8-81833758b6ef', 'eyJ0eXAiOiJKV1QiLCJhbGciOiJIUzI1NiJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJvbGUiOiJzZXJ2aWNlX3JvbGUiLCJpYXQiOjE3NzM4MjMzOTIsImV4cCI6MTMyODQ0NjMzOTJ9.oireOHNL8f79izqvW0H6_M7elhRvL4hA3Z3NrlFMkkQ', null, null, '0822c026-e528-49e3-bf0a-377b174a9529');

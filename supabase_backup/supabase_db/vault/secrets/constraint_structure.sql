@@ -1,0 +1,1 @@
+ALTER TABLE "vault"."secrets" ADD CONSTRAINT "secrets_pkey" PRIMARY KEY (id);

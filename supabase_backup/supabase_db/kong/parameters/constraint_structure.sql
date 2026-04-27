@@ -1,0 +1,1 @@
+ALTER TABLE "kong"."parameters" ADD CONSTRAINT "parameters_pkey" PRIMARY KEY (key);

@@ -1,0 +1,2 @@
+ALTER TABLE "_supavisor"."cluster_tenants" ADD CONSTRAINT "cluster_tenants_pkey" PRIMARY KEY (id);
+ALTER TABLE "_supavisor"."cluster_tenants" ADD CONSTRAINT "type" CHECK (((type)::text = ANY ((ARRAY['read'::character varying, 'write'::character varying])::text[])));

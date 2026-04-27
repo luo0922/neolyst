@@ -1,0 +1,1 @@
+CREATE INDEX "secrets_name_idx" ON "vault"."secrets" (name);

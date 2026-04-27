@@ -1,0 +1,1 @@
+ALTER TABLE "_realtime"."extensions" ADD CONSTRAINT "extensions_pkey" PRIMARY KEY (id);

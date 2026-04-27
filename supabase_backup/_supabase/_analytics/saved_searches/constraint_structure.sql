@@ -1,0 +1,1 @@
+ALTER TABLE "_analytics"."saved_searches" ADD CONSTRAINT "saved_searches_pkey" PRIMARY KEY (id);

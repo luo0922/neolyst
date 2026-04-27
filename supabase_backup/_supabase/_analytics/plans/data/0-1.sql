@@ -1,0 +1,2 @@
+INSERT INTO "_analytics"."plans" ("id", "name", "stripe_id", "inserted_at", "updated_at", "period", "price", "limit_sources", "limit_rate_limit", "limit_alert_freq", "limit_source_rate_limit", "limit_saved_search_limit", "limit_team_users_limit", "limit_source_fields_limit", "limit_source_ttl", "type") VALUES 
+('1', 'Enterprise', null, '2026-03-18 08:46:57', '2026-03-18 08:46:57', 'year', '20000', '500', '500000', '1000', '100000', '1', '2', '500', '5184000000', 'standard');

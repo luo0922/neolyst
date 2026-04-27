@@ -1,0 +1,10 @@
+CREATE INDEX "idx_ds_9aeced5b_claim_pending" ON "dataset_0aece77c_f8b8_484a_8322_78b538ecc038_vector"."lightrag_doc_status" (workspace, updated_at);
+CREATE INDEX "idx_ds_9aeced5b_doc_status_ws_upd" ON "dataset_0aece77c_f8b8_484a_8322_78b538ecc038_vector"."lightrag_doc_status" (workspace, updated_at);
+CREATE INDEX "idx_ds_9aeced5b_claim_failed" ON "dataset_0aece77c_f8b8_484a_8322_78b538ecc038_vector"."lightrag_doc_status" (workspace, updated_at);
+CREATE INDEX "idx_ds_9aeced5b_doc_status_ws_fp" ON "dataset_0aece77c_f8b8_484a_8322_78b538ecc038_vector"."lightrag_doc_status" (workspace, file_path);
+CREATE INDEX "idx_lightrag_doc_status_workspace_id" ON "dataset_0aece77c_f8b8_484a_8322_78b538ecc038_vector"."lightrag_doc_status" (workspace, id);
+CREATE INDEX "idx_ds_9aeced5b_doc_status_ws_st_crt" ON "dataset_0aece77c_f8b8_484a_8322_78b538ecc038_vector"."lightrag_doc_status" (workspace, status, created_at);
+CREATE INDEX "idx_ds_9aeced5b_doc_status_ws_st_upd" ON "dataset_0aece77c_f8b8_484a_8322_78b538ecc038_vector"."lightrag_doc_status" (workspace, status, updated_at);
+CREATE INDEX "idx_ds_9aeced5b_claim_processing" ON "dataset_0aece77c_f8b8_484a_8322_78b538ecc038_vector"."lightrag_doc_status" (workspace, updated_at);
+CREATE INDEX "idx_lightrag_doc_status_id" ON "dataset_0aece77c_f8b8_484a_8322_78b538ecc038_vector"."lightrag_doc_status" (id);
+CREATE INDEX "idx_ds_9aeced5b_doc_status_ws_crt" ON "dataset_0aece77c_f8b8_484a_8322_78b538ecc038_vector"."lightrag_doc_status" (workspace, created_at);

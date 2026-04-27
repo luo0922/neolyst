@@ -2,6 +2,15 @@
 
 记录项目级关键变更（按时间倒序）。
 
+## 2026-04-08
+
+### Supabase 本地开发口径重写
+- `supabase/SUPABASE_DB_VERSIONING.md` 已按 Supabase 官方当前最佳实践重写：
+  - 默认开发环境改为本地 Supabase
+  - 明确 migration / SQL seed / `seed.ts` 职责边界
+  - 补充远端 `db pull` 回收、Branching、CI/CD 与禁止清单
+- `supabase/README.md` 已同步改写为本地开发优先的 CLI 操作手册。
+
 ## 2026-02-23
 
 ### Desktop 卡片标题更新
@@ -35,7 +44,7 @@
   - 增加发布快照字段回归校验口径
 - 回填 `docs/LOGIC.md`：
   - 补充 `/auth/callback` 分支处理与失败跳转规则
-- 修正 `docs/SUPABASE_DB_VERSIONING.md`：
+- 修正 `supabase/SUPABASE_DB_VERSIONING.md`：
   - 将 `seed:auth` 示例改为 `pnpm exec tsx`，与 `pnpm-only` 口径一致。
 
 ## 2026-02-18

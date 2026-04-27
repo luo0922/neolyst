@@ -1,0 +1,1 @@
+ALTER TABLE "public"."rqc_approve" ADD CONSTRAINT "rqc_approve_pkey" PRIMARY KEY (id);

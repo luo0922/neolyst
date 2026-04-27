@@ -1,0 +1,1 @@
+ALTER TABLE "_analytics"."plans" ADD CONSTRAINT "plans_pkey" PRIMARY KEY (id);

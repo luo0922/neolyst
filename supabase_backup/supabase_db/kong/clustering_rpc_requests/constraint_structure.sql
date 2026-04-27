@@ -1,0 +1,1 @@
+ALTER TABLE "kong"."clustering_rpc_requests" ADD CONSTRAINT "clustering_rpc_requests_pkey" PRIMARY KEY (id);

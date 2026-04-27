@@ -1,0 +1,1 @@
+ALTER TABLE "_analytics"."team_users" ADD CONSTRAINT "team_users_pkey" PRIMARY KEY (id);

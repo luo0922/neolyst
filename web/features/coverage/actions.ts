@@ -20,7 +20,7 @@ import {
 
 async function validateCoverageSelectOptions(input: {
   sector_id?: string;
-  analysts?: { analyst_id: string }[];
+  analysts?: { analyst_email: string }[];
 }): Promise<string | null> {
   if (!input.sector_id && !input.analysts) {
     return null;
@@ -45,11 +45,11 @@ async function validateCoverageSelectOptions(input: {
     if (!analystsResult || !analystsResult.ok) {
       return "Failed to validate analyst list.";
     }
-    const activeAnalystIds = new Set(
-      analystsResult.data.map((item) => item.id),
+    const activeAnalystEmails = new Set(
+      analystsResult.data.map((item) => item.email.toLowerCase()),
     );
     const hasInvalidAnalyst = input.analysts.some(
-      (item) => !activeAnalystIds.has(item.analyst_id),
+      (item) => !activeAnalystEmails.has(item.analyst_email.toLowerCase()),
     );
     if (hasInvalidAnalyst) {
       return "Analyst must be selected from the active analyst list.";

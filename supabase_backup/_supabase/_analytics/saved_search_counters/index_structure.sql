@@ -1,0 +1,2 @@
+ALTER TABLE "_analytics"."saved_search_counters" ADD CONSTRAINT "saved_search_counters_saved_search_id_fkey" FOREIGN KEY (saved_search_id) REFERENCES _analytics.saved_searches(id) ON DELETE CASCADE;
+CREATE INDEX "saved_search_counters_timestamp_saved_search_id_granularity_ind" ON "_analytics"."saved_search_counters" (timestamp, saved_search_id, granularity);

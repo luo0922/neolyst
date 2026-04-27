@@ -1,0 +1,21 @@
+CREATE TABLE IF NOT EXISTS "kong"."services"(
+ "id" uuid   NOT NULL ,
+ "created_at" timestamp with time zone   ,
+ "updated_at" timestamp with time zone   ,
+ "name" text   ,
+ "retries" bigint   ,
+ "protocol" text   ,
+ "host" text   ,
+ "port" bigint   ,
+ "path" text   ,
+ "connect_timeout" bigint   ,
+ "write_timeout" bigint   ,
+ "read_timeout" bigint   ,
+ "tags" text[]   ,
+ "client_certificate_id" uuid   ,
+ "tls_verify" boolean   ,
+ "tls_verify_depth" smallint   ,
+ "ca_certificates" uuid[]   ,
+ "ws_id" uuid   ,
+ "enabled" boolean  DEFAULT true   
+);

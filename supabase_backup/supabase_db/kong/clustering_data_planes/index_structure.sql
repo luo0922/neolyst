@@ -1,0 +1,1 @@
+CREATE INDEX "clustering_data_planes_ttl_idx" ON "kong"."clustering_data_planes" (ttl);

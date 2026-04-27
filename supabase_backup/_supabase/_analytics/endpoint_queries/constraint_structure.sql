@@ -1,0 +1,1 @@
+ALTER TABLE "_analytics"."endpoint_queries" ADD CONSTRAINT "endpoint_queries_pkey" PRIMARY KEY (id);

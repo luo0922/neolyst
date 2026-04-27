@@ -1,0 +1,2 @@
+CREATE INDEX "ix_realtime_subscription_entity" ON "realtime"."subscription" (entity);
+CREATE INDEX "subscription_subscription_id_entity_filters_key" ON "realtime"."subscription" (subscription_id, entity, filters);

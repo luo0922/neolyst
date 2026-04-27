@@ -59,7 +59,7 @@ export function AnalystsPageClient({
     null,
   );
   const [regions, setRegions] = React.useState<RegionOption[]>([]);
-  const [formFullName, setFormFullName] = React.useState("");
+  const [formEnglishName, setFormEnglishName] = React.useState("");
   const [formChineseName, setFormChineseName] = React.useState("");
   const [formEmail, setFormEmail] = React.useState("");
   const [formRegionCode, setFormRegionId] = React.useState("");
@@ -67,7 +67,7 @@ export function AnalystsPageClient({
   const [formSfc, setFormSfc] = React.useState("");
   const [formIsActive, setFormIsActive] = React.useState(true);
   const [formErrors, setFormErrors] = React.useState<{
-    full_name?: string;
+    english_name?: string;
     email?: string;
     region_code?: string;
   }>({});
@@ -75,7 +75,7 @@ export function AnalystsPageClient({
 
   // Delete confirm
   const [deleteOpen, setDeleteOpen] = React.useState(false);
-  const [deleteId, setDeleteId] = React.useState<string | null>(null);
+  const [deleteEmail, setDeleteEmail] = React.useState<string | null>(null);
   const [deleteLoading, setDeleteLoading] = React.useState(false);
 
   // Load regions when modal opens
@@ -98,7 +98,7 @@ export function AnalystsPageClient({
 
   function openCreate() {
     setEditingAnalyst(null);
-    setFormFullName("");
+    setFormEnglishName("");
     setFormChineseName("");
     setFormEmail("");
     setFormRegionId("");
@@ -111,7 +111,7 @@ export function AnalystsPageClient({
 
   function openEdit(analyst: Analyst) {
     setEditingAnalyst(analyst);
-    setFormFullName(analyst.full_name);
+    setFormEnglishName(analyst.english_name);
     setFormChineseName(analyst.chinese_name ?? "");
     setFormEmail(analyst.email);
     setFormRegionId(analyst.region_code ?? "");
@@ -125,12 +125,12 @@ export function AnalystsPageClient({
   async function submitForm(e: React.FormEvent) {
     e.preventDefault();
 
-    const full_name = formFullName.trim();
+    const english_name = formEnglishName.trim();
     const email = formEmail.trim();
     const region_code = formRegionCode;
 
-    const next: { full_name?: string; email?: string; region_code?: string } = {};
-    if (!full_name) next.full_name = "Full name is required";
+    const next: { english_name?: string; email?: string; region_code?: string } = {};
+    if (!english_name) next.english_name = "English name is required";
     if (!email) next.email = "Email is required";
     if (!region_code) next.region_code = "Region is required";
     setFormErrors(next);
@@ -138,7 +138,7 @@ export function AnalystsPageClient({
 
     setFormLoading(true);
     const data = {
-      full_name,
+      english_name,
       chinese_name: formChineseName.trim() || undefined,
       email,
       region_code,
@@ -148,7 +148,7 @@ export function AnalystsPageClient({
     };
 
     const res = editingAnalyst
-      ? await updateAnalystAction(editingAnalyst.id, data)
+      ? await updateAnalystAction(editingAnalyst.email, data)
       : await createAnalystAction(data);
     setFormLoading(false);
 
@@ -165,15 +165,15 @@ export function AnalystsPageClient({
   }
 
   function openDelete(analyst: Analyst) {
-    setDeleteId(analyst.id);
+    setDeleteEmail(analyst.email);
     setDeleteOpen(true);
   }
 
   async function confirmDelete() {
-    if (!deleteId) return;
+    if (!deleteEmail) return;
 
     setDeleteLoading(true);
-    const res = await deleteAnalystAction(deleteId);
+    const res = await deleteAnalystAction(deleteEmail);
     setDeleteLoading(false);
 
     if (!res.ok) {
@@ -218,7 +218,7 @@ export function AnalystsPageClient({
         <Table>
           <THead>
             <TR className="hover:bg-transparent">
-              <TH>Full Name</TH>
+              <TH>English Name</TH>
               <TH>Chinese Name</TH>
               <TH>Email</TH>
               <TH>Region</TH>
@@ -236,9 +236,9 @@ export function AnalystsPageClient({
               </TR>
             ) : (
               analysts.map((analyst) => (
-                <TR key={analyst.id}>
+                <TR key={analyst.email}>
                   <TD className="font-medium text-[var(--fg-primary)]">
-                    {analyst.full_name}
+                    {analyst.english_name}
                   </TD>
                   <TD className="text-[var(--fg-secondary)]">
                     {analyst.chinese_name || "-"}
@@ -308,12 +308,12 @@ export function AnalystsPageClient({
       >
         <form id="analyst-form" className="space-y-3" onSubmit={submitForm}>
           <Input
-            id="full_name"
-            label="Full Name"
+            id="english_name"
+            label="English Name"
             placeholder="e.g., Zhang San"
-            value={formFullName}
-            onChange={(e) => setFormFullName(e.target.value)}
-            error={formErrors.full_name}
+            value={formEnglishName}
+            onChange={(e) => setFormEnglishName(e.target.value)}
+            error={formErrors.english_name}
           />
           <Input
             id="chinese_name"

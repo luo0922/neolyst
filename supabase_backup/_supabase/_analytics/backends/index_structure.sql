@@ -1,0 +1,2 @@
+ALTER TABLE "_analytics"."backends" ADD CONSTRAINT "backends_user_id_fkey" FOREIGN KEY (user_id) REFERENCES _analytics.users(id);
+CREATE INDEX "idx_backends_default_ingest" ON "_analytics"."backends" (default_ingest);

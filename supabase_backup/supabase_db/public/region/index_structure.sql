@@ -1,0 +1,1 @@
+CREATE INDEX "idx_region_created_at_desc" ON "public"."region" (created_at);

@@ -1,0 +1,1 @@
+CREATE INDEX "vertex_idx_node_id" ON "dataset_0aece77c_f8b8_484a_8322_78b538ecc038_graph"."_ag_label_vertex" (agtype_access_operator);

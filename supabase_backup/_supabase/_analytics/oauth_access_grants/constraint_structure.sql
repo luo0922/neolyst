@@ -1,0 +1,1 @@
+ALTER TABLE "_analytics"."oauth_access_grants" ADD CONSTRAINT "oauth_access_grants_pkey" PRIMARY KEY (id);

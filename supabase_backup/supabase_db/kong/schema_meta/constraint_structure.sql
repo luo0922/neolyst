@@ -1,0 +1,1 @@
+ALTER TABLE "kong"."schema_meta" ADD CONSTRAINT "schema_meta_pkey" PRIMARY KEY (key, subsystem);

@@ -1,0 +1,1 @@
+CREATE INDEX "log_events_59cfa256_b86c_409e_aeb0_b460667ed0a5_timestamp_brin_" ON "_analytics"."log_events_59cfa256_b86c_409e_aeb0_b460667ed0a5" (timestamp);

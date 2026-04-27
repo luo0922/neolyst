@@ -1,0 +1,3 @@
+ALTER TABLE "_analytics"."alert_queries_backends" ADD CONSTRAINT "alert_queries_backends_alert_query_id_fkey" FOREIGN KEY (alert_query_id) REFERENCES _analytics.alert_queries(id) ON DELETE CASCADE;
+ALTER TABLE "_analytics"."alert_queries_backends" ADD CONSTRAINT "alert_queries_backends_backend_id_fkey" FOREIGN KEY (backend_id) REFERENCES _analytics.backends(id) ON DELETE CASCADE;
+CREATE INDEX "alert_queries_backends_alert_query_id_backend_id_index" ON "_analytics"."alert_queries_backends" (alert_query_id, backend_id);

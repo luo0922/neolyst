@@ -1,0 +1,1 @@
+ALTER TABLE "_realtime"."tenants" ADD CONSTRAINT "tenants_pkey" PRIMARY KEY (id);

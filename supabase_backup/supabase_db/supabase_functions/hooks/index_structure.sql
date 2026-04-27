@@ -1,0 +1,2 @@
+CREATE INDEX "supabase_functions_hooks_h_table_id_h_name_idx" ON "supabase_functions"."hooks" (hook_table_id, hook_name);
+CREATE INDEX "supabase_functions_hooks_request_id_idx" ON "supabase_functions"."hooks" (request_id);

@@ -1,0 +1,2 @@
+ALTER TABLE "auth"."saml_providers" ADD CONSTRAINT "saml_providers_sso_provider_id_fkey" FOREIGN KEY (sso_provider_id) REFERENCES auth.sso_providers(id) ON DELETE CASCADE;
+CREATE INDEX "saml_providers_sso_provider_id_idx" ON "auth"."saml_providers" (sso_provider_id);

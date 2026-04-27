@@ -1,0 +1,2 @@
+ALTER TABLE "dataset_0aece77c_f8b8_484a_8322_78b538ecc038_vector"."lightrag_skills" ADD CONSTRAINT "lightrag_skills_pk" PRIMARY KEY (workspace, id);
+ALTER TABLE "dataset_0aece77c_f8b8_484a_8322_78b538ecc038_vector"."lightrag_skills" ADD CONSTRAINT "lightrag_skills_unique_name_version" UNIQUE (workspace, name, version);
