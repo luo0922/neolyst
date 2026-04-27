@@ -19,6 +19,10 @@ import {
   reopenReportAction,
   saveReviewReportContent,
 } from "./repo/report-review-repo";
+import {
+  listReportPushHistory,
+  repushReport,
+} from "./repo/report-push-repo";
 
 type ReviewFilterStatus = "all" | "submitted" | "published" | "rejected";
 type Role = "admin" | "sa" | "analyst";
@@ -209,4 +213,22 @@ export async function saveReviewReportAction(input: unknown): Promise<Result<Awa
   }
 
   return result;
+}
+
+export async function listReportPushHistoryAction(reportId: string) {
+  return listReportPushHistory(reportId);
+}
+
+export async function repushReportAction(reportId: string) {
+  const actor = await getReviewerActor();
+  if (!actor.ok) {
+    return actor;
+  }
+
+  const roleCheck = ensureReviewerRole(actor.data.role);
+  if (!roleCheck.ok) {
+    return roleCheck;
+  }
+
+  return repushReport(reportId);
 }

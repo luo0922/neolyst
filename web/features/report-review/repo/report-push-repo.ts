@@ -2,7 +2,80 @@ import "server-only";
 
 import { createAdminClient } from "@/lib/supabase/admin";
 import { createServerClient } from "@/lib/supabase/server";
+import { requireAuth } from "@/lib/supabase/server";
 import type { Result } from "@/lib/result";
+
+export interface ReportPushHistoryItem {
+  id: string;
+  status: "success" | "failed" | "pending";
+  httpStatusCode: number | null;
+  errorMessage: string | null;
+  triggerType: "auto" | "manual";
+  createdAt: string;
+  triggeredByName: string;
+}
+
+export async function listReportPushHistory(
+  reportId: string,
+): Promise<Result<ReportPushHistoryItem[]>> {
+  const adminClient = createAdminClient();
+
+  const { data, error } = await adminClient
+    .from("report_push_log")
+    .select(
+      `
+      id,
+      status,
+      http_status_code,
+      error_message,
+      trigger_type,
+      created_at,
+      triggered_by
+    `,
+    )
+    .eq("report_id", reportId)
+    .order("created_at", { ascending: false });
+
+  if (error) {
+    return { ok: false, error: error.message };
+  }
+
+  const userIds = [...new Set((data ?? []).map((r) => r.triggered_by))];
+  const { data: users } = await adminClient
+    .from("auth.users")
+    .select("id, raw_user_meta_data")
+    .in("id", userIds);
+
+  const userMap = new Map(
+    (users ?? []).map((u) => [
+      u.id,
+      (u.raw_user_meta_data as Record<string, string>)?.full_name ??
+        (u.raw_user_meta_data as Record<string, string>)?.name ??
+        u.id,
+    ]),
+  );
+
+  const items: ReportPushHistoryItem[] = (data ?? []).map((r) => ({
+    id: r.id,
+    status: r.status,
+    httpStatusCode: r.http_status_code,
+    errorMessage: r.error_message,
+    triggerType: r.trigger_type,
+    createdAt: r.created_at,
+    triggeredByName: userMap.get(r.triggered_by) ?? r.triggered_by,
+  }));
+
+  return { ok: true, data: items };
+}
+
+export async function repushReport(reportId: string): Promise<Result<void>> {
+  const user = await requireAuth();
+  return pushReportExternal({
+    reportId,
+    triggeredBy: user.id,
+    triggerType: "manual",
+  });
+}
 
 interface AnalystInfo {
   full_name: string | null;
