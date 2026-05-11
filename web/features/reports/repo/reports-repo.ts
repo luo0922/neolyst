@@ -390,12 +390,16 @@ export async function listReports(
     ),
   ];
   const ownerNamesMap: Record<string, string> = {};
-  for (const ownerId of ownerIds) {
-    const { data: ownerName } = await supabase.rpc("get_user_full_name", {
-      p_user_id: ownerId,
-    });
-    if (ownerName) {
-      ownerNamesMap[ownerId] = ownerName;
+  if (ownerIds.length > 0) {
+    const { createAdminClient } = await import("@/lib/supabase/admin");
+    const admin = createAdminClient();
+    const { data: ownersData } = await admin.auth.admin.listUsers();
+    const filtered = (ownersData?.users ?? []).filter((u) =>
+      ownerIds.includes(u.id)
+    );
+    for (const u of filtered) {
+      ownerNamesMap[u.id] =
+        (u.user_metadata?.full_name as string | undefined) ?? "";
     }
   }
 
@@ -478,10 +482,13 @@ export async function getReportDetail(
   // Fetch owner name
   let ownerName: string | null = null;
   if (reportData.owner_user_id) {
-    const { data: ownerNameData } = await supabase.rpc("get_user_full_name", {
-      p_user_id: reportData.owner_user_id,
-    });
-    ownerName = ownerNameData ?? null;
+    const { createAdminClient } = await import("@/lib/supabase/admin");
+    const admin = createAdminClient();
+    const { data: ownerNameData } = await admin.auth.admin.listUsers();
+    const user = (ownerNameData?.users ?? []).find(
+      (u) => u.id === reportData.owner_user_id
+    );
+    ownerName = (user?.user_metadata?.full_name as string | undefined) ?? null;
   }
 
   // Fetch all analysts from analyst_emails array (no FK, so JS-side join)
@@ -508,12 +515,15 @@ export async function getReportDetail(
     ),
   ];
   const userNamesMap: Record<string, string> = {};
-  for (const userId of uniqueUserIds) {
-    const { data: userData } = await supabase.rpc("get_user_full_name", {
-      p_user_id: userId,
-    });
-    if (userData) {
-      userNamesMap[userId] = userData;
+  if (uniqueUserIds.length > 0) {
+    const { createAdminClient } = await import("@/lib/supabase/admin");
+    const admin = createAdminClient();
+    const { data: usersData } = await admin.auth.admin.listUsers();
+    for (const u of usersData?.users ?? []) {
+      if (uniqueUserIds.includes(u.id)) {
+        userNamesMap[u.id] =
+          (u.user_metadata?.full_name as string | undefined) ?? "";
+      }
     }
   }
 

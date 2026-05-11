@@ -21,11 +21,11 @@ begin
         raise exception '报告状态为 %，无法发布（仅 submitted 可发布）', v_status;
     end if;
 
-    update public.report
-       set status = 'published',
-           published_by = auth.uid(),
-           published_at = now()
-     where id = p_report_id;
+    update public.report r
+       set r.status = 'published',
+           r.published_by = auth.uid(),
+           r.published_at = now()
+     where r.id = p_report_id;
 
     return query select p_report_id, 'published'::text;
 end;
@@ -59,10 +59,10 @@ begin
         raise exception '报告状态为 %，无法退回（仅 submitted 可退回）', v_status;
     end if;
 
-    update public.report
-       set status = 'rejected',
-           rejection_reason = p_rejection_reason
-     where id = p_report_id;
+    update public.report r
+       set r.status = 'rejected',
+           r.rejection_reason = p_rejection_reason
+     where r.id = p_report_id;
 
     return query select p_report_id, 'rejected'::text;
 end;
