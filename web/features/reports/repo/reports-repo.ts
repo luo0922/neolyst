@@ -215,7 +215,7 @@ export async function reportTypeExists(reportType: string): Promise<Result<boole
 
   const { data, error } = await supabase
     .from("report_type")
-    .select("id")
+    .select("report_type")
     .eq("report_type", reportType)
     .eq("is_active", true)
     .limit(1);

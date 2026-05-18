@@ -416,6 +416,7 @@ export function CoveragePageClient({
               <TH>English Name</TH>
               <TH>Sector</TH>
               <TH>Analysts</TH>
+              <TH>Status</TH>
               <TH>Updated</TH>
               <TH className="text-right">Actions</TH>
             </TR>
@@ -423,7 +424,7 @@ export function CoveragePageClient({
           <tbody>
             {coverages.length === 0 ? (
               <TR className="hover:bg-transparent">
-                <TD colSpan={6} className="py-10 text-center text-[var(--fg-secondary)]">
+                <TD colSpan={7} className="py-10 text-center text-[var(--fg-secondary)]">
                   No coverages found
                 </TD>
               </TR>
@@ -441,6 +442,13 @@ export function CoveragePageClient({
                   </TD>
                   <TD className="text-[var(--fg-secondary)]">
                     {getAnalystNames(coverage.analysts)}
+                  </TD>
+                  <TD>
+                    {coverage.is_active ? (
+                      <span className="inline-block rounded bg-green-100 px-2 py-0.5 text-xs font-medium text-green-700">可用</span>
+                    ) : (
+                      <span className="inline-block rounded bg-red-100 px-2 py-0.5 text-xs font-medium text-red-700">不可用</span>
+                    )}
                   </TD>
                   <TD className="text-[var(--fg-secondary)]">
                     {formatShanghaiYmd(coverage.updated_at)}
