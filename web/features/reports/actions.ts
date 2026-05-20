@@ -54,7 +54,7 @@ function canCreateOrEdit(role: Role): boolean {
 }
 
 function isEditableStatus(status: ReportStatus): boolean {
-  return status === "draft" || status === "submitted";
+  return status === "draft" || status === "rejected" || status === "submitted";
 }
 
 function trimToNull(value?: string | number | null): string | null {

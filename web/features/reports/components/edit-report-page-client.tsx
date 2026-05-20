@@ -137,7 +137,9 @@ export function EditReportPageClient({
     userRole === "admin" ||
     (userRole === "analyst" &&
       activeReport.owner_user_id === currentUserId &&
-      (activeReport.status === "draft" || activeReport.status === "submitted"));
+      (activeReport.status === "draft" ||
+        activeReport.status === "rejected" ||
+        activeReport.status === "submitted"));
 
   const canSubmit =
     activeReport.status === "draft" &&
