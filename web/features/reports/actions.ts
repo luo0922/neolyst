@@ -28,6 +28,7 @@ import {
   regionCodeExists,
   saveReportContent,
   sectorExists,
+  retractReport,
   submitReport,
   type ReportDetail,
 } from "./repo/reports-repo";
@@ -863,4 +864,39 @@ export async function uploadReportFileAction(
   }
 
   return { ok: true, file_path: filePath };
+}
+
+export async function retractReportAction(
+  reportId: string,
+): Promise<Result<ReportDetail>> {
+  const actor = await getActor();
+  if (!actor.ok) {
+    return actor;
+  }
+
+  const { role, user } = actor.data;
+  if (role !== "analyst" && role !== "admin") {
+    return err("No permission");
+  }
+
+  const detailResult = await getReportDetail(reportId);
+  if (!detailResult.ok) {
+    return detailResult;
+  }
+
+  const detail = detailResult.data;
+  if (detail.status !== "submitted" && detail.status !== "rejected") {
+    return err("Only submitted/rejected reports can be retracted.");
+  }
+
+  if (role === "analyst" && detail.owner_user_id !== user.id) {
+    return err("No permission");
+  }
+
+  const result = await retractReport(reportId);
+  if (result.ok) {
+    revalidatePath("/reports");
+    revalidatePath("/report-review");
+  }
+  return result;
 }

@@ -28,6 +28,7 @@ import {
 import {
   directSubmitReportAction,
   getReportDownloadUrlAction,
+  retractReportAction,
   saveReportContentAction,
   submitReportAction,
   uploadReportFileAction,
@@ -407,7 +408,21 @@ export function EditReportPageClient({
         return;
       }
 
-      setActiveReport(saveResult.data);
+      // Auto-retract if report is submitted or rejected
+      if (
+        activeReport.status === "submitted" ||
+        activeReport.status === "rejected"
+      ) {
+        const retractResult = await retractReportAction(activeReport.id);
+        if (!retractResult.ok) {
+          toast.error(retractResult.error, { title: "Error" });
+          return;
+        }
+        setActiveReport(retractResult.data);
+      } else {
+        setActiveReport(saveResult.data);
+      }
+
       setReportFile(null);
       setPdfFile(null);
       setModelFile(null);
