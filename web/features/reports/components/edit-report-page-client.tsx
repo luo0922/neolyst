@@ -761,6 +761,7 @@ export function EditReportPageClient({
             value={formInvestmentThesis}
             onChange={setFormInvestmentThesis}
             minHeight="150px"
+            readOnly={!canEdit}
           />
         </section>
 
