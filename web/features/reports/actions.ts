@@ -842,14 +842,30 @@ export async function uploadReportFileAction(
     return { ok: false, error: "Missing required fields." };
   }
 
-  const safeName = file.name.replace(/[^a-zA-Z0-9._-]/g, "_");
-  const timestamp = new Date().toISOString().replace(/[:.]/g, "-");
+  // Keep only safe characters: alphanumeric, underscore, hyphen, dot, and Unicode
+  // Supabase Storage (S3) disallows: < > : " / \ | ? * ( ) control chars, # % ~
+  const safeName = file.name.replace(/[<>:"/\\|?*()#%~\x00-\x1f]/g, "_");
+  const timestamp = new Date()
+    .toISOString()
+    .replace("T", "_")
+    .replace(/\.\d{3}Z$/, "")
+    .replace(/:/g, "-");
 
-  // Path format: reports/{reportId}/{label}/{timestamp}_{filename}
-  // Valid labels: "report", "report-pdf", "model"
-  const filePath = `reports/${reportId}/${label}/${timestamp}_${safeName}`;
-
+  // Get upload directory from RPC (format: {id}/{label}/{timestamp}/, relative to bucket)
   const supabase = createServiceRoleClient();
+  const { data: dirPrefix, error: dirError } = await supabase.rpc(
+    "generate_upload_path",
+    { p_report_id: reportId, p_file_category: label },
+  );
+
+  // Fallback: RPC may fail for reviewer (submitted status) or unsupported labels (report-pdf)
+  // Construct path locally in the same format: {id}/{label}/{timestamp}/
+  const uploadDir =
+    dirPrefix ?? `${reportId}/${label}/${timestamp}/`;
+
+  // Path: {id}/{label}/{timestamp}/{filename}
+  const filePath = `${uploadDir}${safeName}`;
+
   const arrayBuffer = await file.arrayBuffer();
 
   const { error } = await supabase.storage

@@ -1,6 +1,7 @@
 import "server-only";
 
 import type { Result } from "@/lib/result";
+import { createServerClient } from "@/lib/supabase/server";
 
 import {
   getReportDetail,
@@ -8,7 +9,6 @@ import {
   publishReport,
   rejectReport,
   retractReport,
-  saveReportContent,
   type ReportDetail,
   type ReportSummary,
 } from "@/features/reports/repo/reports-repo";
@@ -89,23 +89,39 @@ export async function saveReviewReportContent(params: {
   pdf_path?: string | null;
   model_path?: string | null;
 }): Promise<Result<ReportDetail>> {
-  return saveReportContent({
-    report_id: params.report_id,
+  const supabase = await createServerClient();
+
+  const analystEmails = params.analysts.map((a) =>
+    a.analyst_email.toLowerCase(),
+  );
+  const leadAnalyst = analystEmails[0] ?? null;
+
+  const updateData: Record<string, unknown> = {
     title: params.title,
-    report_type: params.report_type,
-    ticker: params.ticker,
-    rating: params.rating,
-    target_price: params.target_price,
-    region_code: params.region_code,
-    sector_id: params.sector_id,
-    report_language: params.report_language,
-    contact_person: params.contact_person,
-    investment_thesis: params.investment_thesis,
-    coverage_id: params.coverage_id,
-    analysts: params.analysts,
-    changed_by: params.changed_by,
-    word_path: params.word_path,
-    pdf_path: params.pdf_path,
-    model_path: params.model_path,
-  });
+    investment_thesis: params.investment_thesis ?? null,
+    lead_analyst_email: leadAnalyst,
+    analyst_emails: analystEmails,
+    contact_person: params.contact_person ?? null,
+  };
+  if (params.word_path) {
+    updateData.word_path = params.word_path;
+  }
+  if (params.pdf_path) {
+    updateData.pdf_path = params.pdf_path;
+  }
+  if (params.model_path) {
+    updateData.model_path = params.model_path;
+  }
+
+  const { error } = await supabase
+    .from("report")
+    .update(updateData)
+    .eq("id", params.report_id)
+    .eq("status", "submitted");
+
+  if (error) {
+    return { ok: false, error: error.message };
+  }
+
+  return getReportDetail(params.report_id);
 }

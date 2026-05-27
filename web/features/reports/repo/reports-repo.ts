@@ -22,6 +22,13 @@ export type ReportAnalystEmail = {
 };
 
 // ReportStatusLog: no version_no, file paths now in metadata JSONB
+export type ReportStatusLogMetadata = {
+  word_path: string | null;
+  pdf_path: string | null;
+  model_path: string | null;
+  [key: string]: unknown;
+};
+
 export type ReportStatusLog = {
   id: string;
   report_id: string;
@@ -32,7 +39,7 @@ export type ReportStatusLog = {
   action_at: string;
   reason: string | null;
   created_at: string;
-  metadata: Record<string, unknown>;
+  metadata: ReportStatusLogMetadata;
 };
 
 export type ReportSummary = {
@@ -530,7 +537,7 @@ export async function getReportDetail(
   const processedLogs = (logs ?? []).map((l: Record<string, unknown>) => ({
     ...l,
     action_by_name: userNamesMap[l.action_by as string] ?? null,
-    metadata: (l.metadata as Record<string, unknown>) ?? {},
+    metadata: ((l.metadata as Record<string, unknown>) ?? {}) as ReportStatusLogMetadata,
   })) as ReportStatusLog[];
 
   const summary = normalizeReportSummaryRow(
@@ -625,12 +632,12 @@ export async function saveReportContent(
     return err(upsertError.message);
   }
 
-  // Step 2: update doc paths (word + pdf)
-  if (params.word_path || params.pdf_path) {
+  // Step 2: update doc paths (word + pdf) — only when both are present
+  if (params.word_path && params.pdf_path) {
     const { error: docError } = await supabase.rpc("update_report_doc_paths", {
       p_report_id: params.report_id,
-      p_word_path: params.word_path ?? "",
-      p_pdf_path: params.pdf_path ?? "",
+      p_word_path: params.word_path,
+      p_pdf_path: params.pdf_path,
     });
     if (docError) {
       return err(docError.message);

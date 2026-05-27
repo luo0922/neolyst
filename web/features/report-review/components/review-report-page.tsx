@@ -138,7 +138,7 @@ export function ReviewReportPage({
     });
   }
 
-  async function handleDownload(filePath: string, _fileName?: string) {
+  async function handleDownload(filePath: string, fileName: string) {
     if (!detail) {
       return;
     }
@@ -153,7 +153,20 @@ export function ReviewReportPage({
       return;
     }
 
-    window.open(result.data, "_blank", "noopener,noreferrer");
+    try {
+      const response = await fetch(result.data);
+      const blob = await response.blob();
+      const url = window.URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = fileName;
+      document.body.appendChild(a);
+      a.click();
+      window.URL.revokeObjectURL(url);
+      document.body.removeChild(a);
+    } catch {
+      window.open(result.data, "_blank", "noopener,noreferrer");
+    }
   }
 
   async function uploadReportFiles(): Promise<{
@@ -567,7 +580,7 @@ export function ReviewReportPage({
                         d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"
                       />
                     </svg>
-                    Report File
+                    {detail.word_path.split("/").pop()}
                   </button>
                 ) : null}
               </div>
@@ -617,7 +630,7 @@ export function ReviewReportPage({
                         d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"
                       />
                     </svg>
-                    PDF File
+                    {detail.pdf_path.split("/").pop()}
                   </button>
                 ) : null}
               </div>
@@ -649,7 +662,7 @@ export function ReviewReportPage({
                       d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"
                     />
                   </svg>
-                  Model File
+                  {detail.model_path.split("/").pop()}
                 </button>
               </div>
             ) : null}
@@ -707,6 +720,46 @@ export function ReviewReportPage({
                   {item.reason ? (
                     <div className="mt-1 text-xs text-amber-300">
                       Note: {item.reason}
+                    </div>
+                  ) : null}
+                  {(item.metadata.word_path || item.metadata.pdf_path || item.metadata.model_path) ? (
+                    <div className="mt-2 space-y-1">
+                      {item.metadata.word_path ? (
+                        <button
+                          type="button"
+                          className="flex items-center gap-1 text-xs text-blue-500 hover:underline"
+                          onClick={() => handleDownload(item.metadata.word_path!, item.metadata.word_path!.split("/").pop() ?? "report.docx")}
+                        >
+                          <svg className="h-3 w-3 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+                          </svg>
+                          {item.metadata.word_path.split("/").pop()}
+                        </button>
+                      ) : null}
+                      {item.metadata.pdf_path ? (
+                        <button
+                          type="button"
+                          className="flex items-center gap-1 text-xs text-blue-500 hover:underline"
+                          onClick={() => handleDownload(item.metadata.pdf_path!, item.metadata.pdf_path!.split("/").pop() ?? "report.pdf")}
+                        >
+                          <svg className="h-3 w-3 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+                          </svg>
+                          {item.metadata.pdf_path.split("/").pop()}
+                        </button>
+                      ) : null}
+                      {item.metadata.model_path ? (
+                        <button
+                          type="button"
+                          className="flex items-center gap-1 text-xs text-blue-500 hover:underline"
+                          onClick={() => handleDownload(item.metadata.model_path!, item.metadata.model_path!.split("/").pop() ?? "model.xlsx")}
+                        >
+                          <svg className="h-3 w-3 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+                          </svg>
+                          {item.metadata.model_path.split("/").pop()}
+                        </button>
+                      ) : null}
                     </div>
                   ) : null}
                 </div>
