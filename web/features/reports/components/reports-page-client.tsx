@@ -12,6 +12,7 @@ import { Select } from "@/components/ui/select";
 import { Table, TD, TH, THead, TR } from "@/components/ui/table";
 import type { ReportStatus } from "@/domain/schemas/report";
 import type { ReportSummary } from "@/features/reports/repo/reports-repo";
+import { terminateReportAction } from "@/features/reports/actions";
 
 const STATUS_OPTIONS: { value: string; label: string }[] = [
   { value: "all", label: "All" },
@@ -19,6 +20,7 @@ const STATUS_OPTIONS: { value: string; label: string }[] = [
   { value: "submitted", label: "Submitted" },
   { value: "published", label: "Published" },
   { value: "rejected", label: "Rejected" },
+  { value: "terminated", label: "Terminated" },
 ];
 
 function statusTone(
@@ -27,6 +29,7 @@ function statusTone(
   if (status === "draft") return "secondary";
   if (status === "submitted") return "blue";
   if (status === "published") return "green";
+  if (status === "terminated") return "red";
   return "red";
 }
 
@@ -214,6 +217,23 @@ export function ReportsPageClient({
                           {canEditReport(report) ? "Edit" : "View"}
                         </Button>
                       </Link>
+                      {report.status !== "published" && report.status !== "terminated" && (
+                        <Button
+                          variant="outline"
+                          className="h-7 px-2 text-xs text-red-600"
+                          onClick={async () => {
+                            if (!confirm("Terminate this report?")) return;
+                            const result = await terminateReportAction(report.id);
+                            if (result.ok) {
+                              router.refresh();
+                            } else {
+                              alert(result.error);
+                            }
+                          }}
+                        >
+                          Terminate
+                        </Button>
+                      )}
                     </div>
                   </TD>
                 </TR>

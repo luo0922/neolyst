@@ -13,6 +13,7 @@ export const reportStatuses = [
   "submitted",
   "published",
   "rejected",
+  "terminated",
 ] as const;
 
 export const reportLanguages = ["zh", "en"] as const;

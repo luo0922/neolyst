@@ -755,3 +755,22 @@ export async function getReportDownloadUrl(params: {
 
   return ok(data.signedUrl);
 }
+
+/**
+ * Terminate a report: calls terminate_report RPC
+ */
+export async function terminateReport(
+  reportId: string,
+): Promise<Result<ReportDetail>> {
+  const supabase = await createServerClient();
+
+  const { error } = await supabase.rpc("terminate_report", {
+    p_report_id: reportId,
+  });
+
+  if (error) {
+    return err(error.message);
+  }
+
+  return getReportDetail(reportId);
+}

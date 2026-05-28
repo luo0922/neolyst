@@ -20,7 +20,7 @@ export interface ReportReviewPageClientProps {
   page: number;
   totalPages: number;
   currentQuery: string | null;
-  currentStatus: "all" | "submitted" | "published" | "rejected";
+  currentStatus: "all" | "submitted" | "published" | "rejected" | "terminated";
 }
 
 const FILTER_OPTIONS = [
@@ -28,11 +28,13 @@ const FILTER_OPTIONS = [
   { value: "submitted", label: "Submitted" },
   { value: "published", label: "Published" },
   { value: "rejected", label: "Rejected" },
+  { value: "terminated", label: "Terminated" },
 ];
 
 function statusTone(status: string): "blue" | "green" | "red" {
   if (status === "submitted") return "blue";
   if (status === "published") return "green";
+  if (status === "terminated") return "red";
   return "red";
 }
 

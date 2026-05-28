@@ -11,14 +11,14 @@ export interface ReportReviewPageProps {
   }>;
 }
 
-const VALID_STATUS = new Set(["all", "submitted", "published", "rejected"]);
+const VALID_STATUS = new Set(["all", "submitted", "published", "rejected", "terminated"]);
 
 export async function ReportReviewPage({ searchParams }: ReportReviewPageProps) {
   const params = await searchParams;
   const page = Math.max(1, Number(params.page ?? 1) || 1);
   const query = params.query?.trim() || null;
   const status = VALID_STATUS.has(params.status ?? "")
-    ? (params.status as "all" | "submitted" | "published" | "rejected")
+    ? (params.status as "all" | "submitted" | "published" | "rejected" | "terminated")
     : "all";
 
   const listResult = await listReviewReportsAction({

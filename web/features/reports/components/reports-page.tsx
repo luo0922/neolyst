@@ -20,6 +20,7 @@ const VALID_STATUSES = new Set<ReportStatus>([
   "submitted",
   "published",
   "rejected",
+  "terminated",
 ]);
 
 export async function ReportsPage({

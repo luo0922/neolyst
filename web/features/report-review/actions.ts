@@ -24,7 +24,7 @@ import {
   repushReport,
 } from "./repo/report-push-repo";
 
-type ReviewFilterStatus = "all" | "submitted" | "published" | "rejected";
+type ReviewFilterStatus = "all" | "submitted" | "published" | "rejected" | "terminated";
 type Role = "admin" | "sa" | "analyst";
 
 async function getReviewerActor(): Promise<
