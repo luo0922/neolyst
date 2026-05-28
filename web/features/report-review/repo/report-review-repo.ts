@@ -17,7 +17,7 @@ import type { ReportAnalystInput } from "@/domain/schemas/report";
 export async function listReviewReports(params: {
   page: number;
   query: string | null;
-  status: "all" | "submitted" | "published" | "rejected";
+  status: "all" | "submitted" | "published" | "rejected" | "terminated";
 }): Promise<
   Result<{
     items: ReportSummary[];
