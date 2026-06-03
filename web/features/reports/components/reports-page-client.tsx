@@ -12,6 +12,8 @@ import { Select } from "@/components/ui/select";
 import { Table, TD, TH, THead, TR } from "@/components/ui/table";
 import type { ReportStatus } from "@/domain/schemas/report";
 import type { ReportSummary } from "@/features/reports/repo/reports-repo";
+import type { Analyst } from "@/features/analyst-info/repo/analysts-repo";
+import type { User } from "@supabase/supabase-js";
 import { terminateReportAction } from "@/features/reports/actions";
 
 const STATUS_OPTIONS: { value: string; label: string }[] = [
@@ -71,6 +73,11 @@ export interface ReportsPageClientProps {
   totalPages: number;
   currentQuery: string | null;
   currentStatus: ReportStatus | null;
+  currentReportType: string | null;
+  currentSubmittedBy: string | null;
+  currentAnalyst: string | null;
+  analysts: Analyst[];
+  users: User[];
   userRole: "admin" | "sa" | "analyst";
   currentUserId: string;
 }
@@ -82,6 +89,11 @@ export function ReportsPageClient({
   totalPages,
   currentQuery,
   currentStatus,
+  currentReportType,
+  currentSubmittedBy,
+  currentAnalyst,
+  analysts,
+  users,
   userRole,
   currentUserId,
 }: ReportsPageClientProps) {
@@ -93,16 +105,60 @@ export function ReportsPageClient({
   const [statusFilter, setStatusFilter] = React.useState<string | null>(
     currentStatus ?? defaultStatus,
   );
+  const [reportTypeFilter, setReportTypeFilter] = React.useState(currentReportType ?? "");
+  const [submittedByFilter, setSubmittedByFilter] = React.useState(currentSubmittedBy ?? "");
+  const [analystFilter, setAnalystFilter] = React.useState(currentAnalyst ?? "");
+
+  // Build analyst options for report_type dropdown
+  const reportTypeOptions = React.useMemo(() => {
+    const types = [...new Set(reports.map((r) => r.report_type))];
+    return [
+      { value: "", label: "All types" },
+      ...types.map((t) => ({ value: t, label: t })),
+    ];
+  }, [reports]);
 
   React.useEffect(() => {
     setQueryDraft(currentQuery ?? "");
     setStatusFilter(currentStatus ?? "all");
-  }, [currentQuery, currentStatus]);
+    setReportTypeFilter(currentReportType ?? "");
+    setSubmittedByFilter(currentSubmittedBy ?? "");
+    setAnalystFilter(currentAnalyst ?? "");
+  }, [currentQuery, currentStatus, currentReportType, currentSubmittedBy, currentAnalyst]);
+
+  function buildQueryString(overrides?: Partial<{ q: string; status: string; page: number; report_type: string; submitted_by: string; analyst: string }>) {
+    const sp = new URLSearchParams();
+    const q = overrides?.q ?? queryDraft;
+    const status = overrides?.status ?? statusFilter ?? "all";
+    const rt = overrides?.report_type ?? reportTypeFilter;
+    const sb = overrides?.submitted_by ?? submittedByFilter;
+    const an = overrides?.analyst ?? analystFilter;
+
+    if (q.trim()) {
+      sp.set("query", q.trim());
+    }
+    if (status && status !== "all") {
+      sp.set("status", status);
+    }
+    if (rt) {
+      sp.set("report_type", rt);
+    }
+    if (sb) {
+      sp.set("submitted_by", sb);
+    }
+    if (an) {
+      sp.set("analyst", an);
+    }
+    const page = overrides?.page ?? 1;
+    if (page > 1) {
+      sp.set("page", String(page));
+    }
+    const value = sp.toString();
+    return value ? `?${value}` : "";
+  }
 
   function goToPage(nextPage: number) {
-    router.push(
-      `/reports${toQueryString({ q: queryDraft, status: statusFilter || "all", page: nextPage })}`,
-    );
+    router.push(`/reports${buildQueryString({ page: nextPage })}`);
   }
 
   function submitSearch(e: React.FormEvent) {
@@ -112,9 +168,22 @@ export function ReportsPageClient({
 
   function onStatusChange(value: string) {
     setStatusFilter(value as ReportStatus | "all");
-    router.push(
-      `/reports${toQueryString({ q: queryDraft, status: value, page: 1 })}`,
-    );
+    router.push(`/reports${buildQueryString({ status: value, page: 1 })}`);
+  }
+
+  function onReportTypeChange(value: string) {
+    setReportTypeFilter(value);
+    router.push(`/reports${buildQueryString({ report_type: value, page: 1 })}`);
+  }
+
+  function onSubmittedByChange(value: string) {
+    setSubmittedByFilter(value);
+    router.push(`/reports${buildQueryString({ submitted_by: value, page: 1 })}`);
+  }
+
+  function onAnalystChange(value: string) {
+    setAnalystFilter(value);
+    router.push(`/reports${buildQueryString({ analyst: value, page: 1 })}`);
   }
 
   function canEditReport(
@@ -130,6 +199,13 @@ export function ReportsPageClient({
       );
     }
     return false;
+  }
+
+  function getAnalystNames(analysts: ReportSummary["analysts"]): string {
+    return analysts
+      .sort((a, b) => a.author_order - b.author_order)
+      .map((a) => a.english_name ?? a.analyst_email)
+      .join(", ");
   }
 
   return (
@@ -154,7 +230,7 @@ export function ReportsPageClient({
 
       <main className="mx-auto max-w-7xl space-y-4 px-6 py-8">
         <div className="flex items-end justify-between gap-4">
-          <form className="flex flex-1 gap-4" onSubmit={submitSearch}>
+          <form className="flex flex-1 gap-4 flex-wrap" onSubmit={submitSearch}>
             <div className="w-full max-w-md">
               <Input
                 label="Search"
@@ -163,12 +239,48 @@ export function ReportsPageClient({
                 onChange={(event) => setQueryDraft(event.target.value)}
               />
             </div>
-            <div className="w-56">
+            <div className="w-40">
               <Select
                 label="Status"
                 value={statusFilter ?? "all"}
                 onChange={(event) => onStatusChange(event.target.value)}
                 options={STATUS_OPTIONS}
+              />
+            </div>
+            <div className="w-40">
+              <Select
+                label="Type"
+                value={reportTypeFilter}
+                onChange={(event) => onReportTypeChange(event.target.value)}
+                options={reportTypeOptions}
+              />
+            </div>
+            <div className="w-48">
+              <Select
+                label="Submitted by"
+                value={submittedByFilter}
+                onChange={(event) => onSubmittedByChange(event.target.value)}
+                options={[
+                  { value: "", label: "All users" },
+                  ...users.map((u) => ({
+                    value: u.id,
+                    label: (u.user_metadata?.full_name as string) || u.email,
+                  })),
+                ]}
+              />
+            </div>
+            <div className="w-48">
+              <Select
+                label="Analyst"
+                value={analystFilter}
+                onChange={(event) => onAnalystChange(event.target.value)}
+                options={[
+                  { value: "", label: "All analysts" },
+                  ...analysts.map((a) => ({
+                    value: a.email,
+                    label: a.english_name ?? a.email,
+                  })),
+                ]}
               />
             </div>
           </form>
@@ -181,6 +293,7 @@ export function ReportsPageClient({
               <TH className="whitespace-nowrap">Type</TH>
               <TH className="whitespace-nowrap">Status</TH>
               <TH className="whitespace-nowrap">Owner</TH>
+              <TH className="whitespace-nowrap">Analysts</TH>
               <TH className="whitespace-nowrap">Updated</TH>
               <TH className="text-right">Actions</TH>
             </TR>
@@ -188,7 +301,7 @@ export function ReportsPageClient({
           <tbody>
             {reports.length === 0 ? (
               <TR>
-                <TD colSpan={6} className="py-10 text-center text-[var(--fg-secondary)]">
+                <TD colSpan={7} className="py-10 text-center text-[var(--fg-secondary)]">
                   No reports found.
                 </TD>
               </TR>
@@ -206,6 +319,9 @@ export function ReportsPageClient({
                     {report.owner_user_id === currentUserId
                       ? "Me"
                       : report.owner_name ?? `${report.owner_user_id.slice(0, 8)}...`}
+                  </TD>
+                  <TD className="text-[var(--fg-secondary)]">
+                    {getAnalystNames(report.analysts)}
                   </TD>
                   <TD className="text-[var(--fg-secondary)]">
                     {formatDateTime(report.updated_at)}

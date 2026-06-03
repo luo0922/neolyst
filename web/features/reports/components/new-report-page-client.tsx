@@ -31,6 +31,7 @@ import {
   validateUploadExtension,
   validateWordPptExtension,
   validatePdfExtension,
+  validateImageExtension,
 } from "@/features/reports/file-utils";
 import type { ReportDetail } from "@/features/reports/repo/reports-repo";
 const LANGUAGE_OPTIONS: { value: ReportLanguage; label: string }[] = [
@@ -133,6 +134,7 @@ export function NewReportPageClient({
   const [reportFile, setReportFile] = React.useState<File | null>(null);
   const [pdfFile, setPdfFile] = React.useState<File | null>(null);
   const [modelFile, setModelFile] = React.useState<File | null>(null);
+  const [chiefApprovalFile, setChiefApprovalFile] = React.useState<File | null>(null);
 
   React.useEffect(() => {
     if (!reportTypes.includes(formReportType) && reportTypes.length > 0) {
@@ -260,6 +262,7 @@ export function NewReportPageClient({
           word_path: string | null;
           pdf_path: string | null;
           model_path: string | null;
+          chief_approval_path: string | null;
         };
       }
     | { ok: false; error: string }
@@ -272,6 +275,7 @@ export function NewReportPageClient({
     let wordPath: string | null = activeReport?.word_path ?? null;
     let pdfPath: string | null = activeReport?.pdf_path ?? null;
     let modelPath: string | null = activeReport?.model_path ?? null;
+    let chiefApprovalPath: string | null = activeReport?.chief_approval_path ?? null;
 
     // Upload Word/PPT file
     if (reportFile) {
@@ -330,12 +334,32 @@ export function NewReportPageClient({
       modelPath = result.file_path;
     }
 
+    // Upload Chief Approval file
+    if (chiefApprovalFile) {
+      const check = validateImageExtension(chiefApprovalFile.name);
+      if (!check.ok) {
+        return { ok: false, error: check.error };
+      }
+
+      const fd = new FormData();
+      fd.append("file", chiefApprovalFile);
+      fd.append("reportId", reportId);
+      fd.append("label", "chief-approval");
+
+      const result = await uploadReportFileAction(fd);
+      if (!result.ok) {
+        return { ok: false, error: result.error };
+      }
+      chiefApprovalPath = result.file_path;
+    }
+
     return {
       ok: true,
       data: {
         word_path: wordPath,
         pdf_path: pdfPath,
         model_path: modelPath,
+        chief_approval_path: chiefApprovalPath,
       },
     };
   }
@@ -380,6 +404,7 @@ export function NewReportPageClient({
         word_path: uploadResult.data.word_path,
         pdf_path: uploadResult.data.pdf_path,
         model_path: uploadResult.data.model_path,
+        chief_approval_path: uploadResult.data.chief_approval_path,
       });
 
       if (!saveResult.ok) {
@@ -391,6 +416,7 @@ export function NewReportPageClient({
       setReportFile(null);
       setPdfFile(null);
       setModelFile(null);
+      setChiefApprovalFile(null);
       toast.success("Draft saved.", { title: "Success" });
       router.refresh();
     } finally {
@@ -438,6 +464,7 @@ export function NewReportPageClient({
         word_path: uploadResult.data.word_path,
         pdf_path: uploadResult.data.pdf_path,
         model_path: uploadResult.data.model_path,
+        chief_approval_path: uploadResult.data.chief_approval_path,
       });
 
       if (!directResult.ok) {
@@ -449,6 +476,7 @@ export function NewReportPageClient({
       setReportFile(null);
       setPdfFile(null);
       setModelFile(null);
+      setChiefApprovalFile(null);
       toast.success("Report submitted.", { title: "Success" });
       router.push("/reports");
       router.refresh();
@@ -696,6 +724,13 @@ export function NewReportPageClient({
                 ? "Required for Company report on submit"
                 : "Optional for non-Company reports"
             }
+          />
+          <FileDropzone
+            label="Chief Approval"
+            accept=".jpg,.jpeg,.png,.gif,.webp,.bmp"
+            file={chiefApprovalFile}
+            onFileChange={setChiefApprovalFile}
+            hint="Optional image file for chief approval"
           />
         </section>
 

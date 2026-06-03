@@ -67,6 +67,7 @@ export async function listCoveragesAction(input: {
   page?: number;
   query?: string | null;
   sector_id?: string | null;
+  author?: string | null;
 }): Promise<Result<PaginatedList<CoverageWithDetails>>> {
   await requireAdminOrAnalyst();
 
@@ -74,7 +75,7 @@ export async function listCoveragesAction(input: {
   const query = input.query ?? null;
 
   try {
-    return await listCoveragesRepo({ page, query, sector_id: input.sector_id });
+    return await listCoveragesRepo({ page, query, sector_id: input.sector_id, author: input.author ?? null });
   } catch {
     return err("Failed to list coverages.");
   }

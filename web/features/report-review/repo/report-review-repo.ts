@@ -18,6 +18,9 @@ export async function listReviewReports(params: {
   page: number;
   query: string | null;
   status: "all" | "submitted" | "published" | "rejected" | "terminated";
+  report_type?: string | null;
+  submitted_by?: string | null;
+  analyst?: string | null;
 }): Promise<
   Result<{
     items: ReportSummary[];
@@ -30,6 +33,9 @@ export async function listReviewReports(params: {
     page: params.page,
     query: params.query,
     status: params.status,
+    report_type: params.report_type,
+    submitted_by: params.submitted_by,
+    analyst: params.analyst,
   });
 }
 
@@ -88,6 +94,7 @@ export async function saveReviewReportContent(params: {
   word_path?: string | null;
   pdf_path?: string | null;
   model_path?: string | null;
+  chief_approval_path?: string | null;
 }): Promise<Result<ReportDetail>> {
   const supabase = await createServerClient();
 
@@ -111,6 +118,9 @@ export async function saveReviewReportContent(params: {
   }
   if (params.model_path) {
     updateData.model_path = params.model_path;
+  }
+  if (params.chief_approval_path) {
+    updateData.chief_approval_path = params.chief_approval_path;
   }
 
   const { error } = await supabase

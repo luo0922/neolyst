@@ -11,6 +11,7 @@ export interface CoveragePageProps {
     page?: string;
     query?: string;
     sector_id?: string;
+    author?: string;
   }>;
   userRole: "admin" | "sa" | "analyst";
 }
@@ -20,9 +21,10 @@ export async function CoveragePage({ searchParams, userRole }: CoveragePageProps
   const page = Number(params.page ?? 1);
   const query = params.query ?? null;
   const sector_id = params.sector_id ?? null;
+  const author = params.author ?? null;
 
   const [coveragesResult, sectorsResult, analystsResult, regionsResult] = await Promise.all([
-    listCoveragesAction({ page, query, sector_id }),
+    listCoveragesAction({ page, query, sector_id, author }),
     listSectorsGroupedAction({ is_active: true }),
     listAllActiveAnalysts(),
     listAllRegions(),
@@ -49,6 +51,7 @@ export async function CoveragePage({ searchParams, userRole }: CoveragePageProps
       totalPages={totalPages}
       currentQuery={query}
       currentSectorId={sector_id}
+      currentAuthor={author}
       sectors={sectors}
       analysts={analysts}
       regions={regions}

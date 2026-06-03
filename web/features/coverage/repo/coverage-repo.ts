@@ -65,6 +65,7 @@ export async function listCoverages(params: {
   page: number;
   query: string | null;
   sector_id?: string | null;
+  author?: string | null;
 }): Promise<Result<PaginatedList<CoverageWithDetails>>> {
   const supabase = await createServerClient();
 
@@ -83,18 +84,60 @@ export async function listCoverages(params: {
     queryBuilder = queryBuilder.eq("sector_id", params.sector_id);
   }
 
+  // Filter by analyst
+  let matchedCoverageIds: string[] | null = null;
+  if (params.author) {
+    const authorSearch = `%${params.author.toLowerCase()}%`;
+    // First find analyst emails that match the search term
+    const { data: matchingAnalysts } = await supabase
+      .from("analyst")
+      .select("email")
+      .or(`email.ilike.${authorSearch},english_name.ilike.${authorSearch},chinese_name.ilike.${authorSearch}`);
+
+    if (!matchingAnalysts || matchingAnalysts.length === 0) {
+      return ok({
+        items: [],
+        total: 0,
+        page: params.page,
+        totalPages: 0,
+      });
+    }
+
+    const analystEmails = matchingAnalysts.map((a) => a.email.toLowerCase());
+
+    // Find coverage_ids that have these analysts
+    const { data: caData } = await supabase
+      .from("coverage_analyst")
+      .select("coverage_id")
+      .in("analyst_email", analystEmails);
+
+    if (!caData || caData.length === 0) {
+      return ok({
+        items: [],
+        total: 0,
+        page: params.page,
+        totalPages: 0,
+      });
+    }
+
+    matchedCoverageIds = [...new Set(caData.map((ca) => ca.coverage_id))];
+    queryBuilder = queryBuilder.in("id", matchedCoverageIds);
+  }
+
+  // Get total count for pagination
+  const { count } = await queryBuilder.select("*", { count: "exact", head: true });
+  const total = count ?? 0;
+  const totalPages = Math.ceil(total / PAGE_SIZE);
+
   const from = (params.page - 1) * PAGE_SIZE;
   const to = from + PAGE_SIZE - 1;
 
-  const { data, error, count } = await queryBuilder
+  const { data, error } = await queryBuilder
     .order("updated_at", { ascending: false })
     .range(from, to);
 
   if (error) return err(error.message);
   if (!data) return err("Failed to fetch coverages");
-
-  const total = count ?? 0;
-  const totalPages = Math.ceil(total / PAGE_SIZE);
 
   // JS-side joins: fetch sectors, coverage_analysts, and analysts
   const sectorIds = [

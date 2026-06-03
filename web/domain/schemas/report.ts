@@ -17,7 +17,7 @@ export const reportStatuses = [
 ] as const;
 
 export const reportLanguages = ["zh", "en"] as const;
-export const reportFileLabels = ["report", "report-pdf", "model"] as const;
+export const reportFileLabels = ["report", "report-pdf", "model", "chief-approval"] as const;
 
 export const reportStatusActions = [
   "submit",
@@ -81,12 +81,14 @@ const reportEditableFieldsSchema = z.object({
   word_path: z.string().trim().nullable().optional(),
   pdf_path: z.string().trim().nullable().optional(),
   model_path: z.string().trim().nullable().optional(),
+  chief_approval_path: z.string().trim().nullable().optional(),
 });
 
 export const reportCreateSchema = reportEditableFieldsSchema.omit({
   word_path: true,
   pdf_path: true,
   model_path: true,
+  chief_approval_path: true,
 });
 
 export const reportSaveSchema = reportEditableFieldsSchema.extend({

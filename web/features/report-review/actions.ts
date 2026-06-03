@@ -53,6 +53,9 @@ export async function listReviewReportsAction(input: {
   page?: number;
   query?: string | null;
   status?: ReviewFilterStatus | null;
+  report_type?: string | null;
+  submitted_by?: string | null;
+  analyst?: string | null;
 }): Promise<
   Result<{
     items: Awaited<ReturnType<typeof listReviewReports>> extends Result<infer T>
@@ -80,7 +83,14 @@ export async function listReviewReportsAction(input: {
   const query = input.query ?? null;
   const status = input.status ?? "all";
 
-  const result = await listReviewReports({ page, query, status });
+  const result = await listReviewReports({
+    page,
+    query,
+    status,
+    report_type: input.report_type ?? null,
+    submitted_by: input.submitted_by ?? null,
+    analyst: input.analyst ?? null,
+  });
   if (!result.ok) {
     return result;
   }

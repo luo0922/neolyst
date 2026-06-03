@@ -30,6 +30,7 @@ export interface CoveragePageClientProps {
   totalPages: number;
   currentQuery: string | null;
   currentSectorId: string | null;
+  currentAuthor: string | null;
   sectors: SectorWithChildren[];
   analysts: Analyst[];
   regions: Region[];
@@ -40,12 +41,14 @@ function toQueryString(params: {
   q: string;
   page: number;
   sector_id?: string;
+  author?: string;
 }) {
   const q = params.q.trim();
   const sp = new URLSearchParams();
   if (q) sp.set("query", q);
   if (params.page > 1) sp.set("page", String(params.page));
   if (params.sector_id) sp.set("sector_id", params.sector_id);
+  if (params.author) sp.set("author", params.author);
   const s = sp.toString();
   return s ? `?${s}` : "";
 }
@@ -63,6 +66,7 @@ export function CoveragePageClient({
   totalPages,
   currentQuery,
   currentSectorId,
+  currentAuthor,
   sectors,
   analysts,
   regions,
@@ -93,10 +97,12 @@ export function CoveragePageClient({
 
   const [queryDraft, setQueryDraft] = React.useState(currentQuery ?? "");
   const [sectorFilter, setSectorFilter] = React.useState(currentSectorId ?? "");
+  const [authorFilter, setAuthorFilter] = React.useState(currentAuthor ?? "");
   React.useEffect(() => {
     setQueryDraft(currentQuery ?? "");
     setSectorFilter(currentSectorId ?? "");
-  }, [currentQuery, currentSectorId]);
+    setAuthorFilter(currentAuthor ?? "");
+  }, [currentQuery, currentSectorId, currentAuthor]);
 
   // Create/Edit modal
   const [formOpen, setFormOpen] = React.useState(false);
@@ -321,7 +327,7 @@ export function CoveragePageClient({
 
   function doSearch() {
     router.push(
-      `/coverage${toQueryString({ q: queryDraft, page: 1, sector_id: sectorFilter || undefined })}`,
+      `/coverage${toQueryString({ q: queryDraft, page: 1, sector_id: sectorFilter || undefined, author: authorFilter || undefined })}`,
     );
   }
 
@@ -333,7 +339,14 @@ export function CoveragePageClient({
   function handleSectorChange(value: string) {
     setSectorFilter(value);
     router.push(
-      `/coverage${toQueryString({ q: queryDraft, page: 1, sector_id: value || undefined })}`,
+      `/coverage${toQueryString({ q: queryDraft, page: 1, sector_id: value || undefined, author: authorFilter || undefined })}`,
+    );
+  }
+
+  function handleAuthorChange(value: string) {
+    setAuthorFilter(value);
+    router.push(
+      `/coverage${toQueryString({ q: queryDraft, page: 1, sector_id: sectorFilter || undefined, author: value || undefined })}`,
     );
   }
 
@@ -400,6 +413,20 @@ export function CoveragePageClient({
                       label: `\u00A0\u00A0\u00A0\u00A0${child.name_en}${child.name_cn ? ` (${child.name_cn})` : ""}`,
                     })),
                   ]),
+                ]}
+              />
+            </div>
+            <div className="w-56">
+              <Select
+                label="Analyst"
+                value={authorFilter}
+                onChange={(e) => handleAuthorChange(e.target.value)}
+                options={[
+                  { value: "", label: "All analysts" },
+                  ...analysts.map((a) => ({
+                    value: a.email,
+                    label: a.english_name ?? a.email,
+                  })),
                 ]}
               />
             </div>
@@ -481,7 +508,7 @@ export function CoveragePageClient({
           totalPages={totalPages}
           onChange={(p) =>
             router.push(
-              `/coverage${toQueryString({ q: queryDraft, page: p, sector_id: sectorFilter || undefined })}`,
+              `/coverage${toQueryString({ q: queryDraft, page: p, sector_id: sectorFilter || undefined, author: authorFilter || undefined })}`,
             )
           }
         />

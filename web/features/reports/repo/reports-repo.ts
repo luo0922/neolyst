@@ -26,6 +26,7 @@ export type ReportStatusLogMetadata = {
   word_path: string | null;
   pdf_path: string | null;
   model_path: string | null;
+  chief_approval_path: string | null;
   [key: string]: unknown;
 };
 
@@ -64,6 +65,7 @@ export type ReportSummary = {
   word_path: string | null;
   pdf_path: string | null;
   model_path: string | null;
+  chief_approval_path: string | null;
   // published_by/published_at added
   published_by: string | null;
   published_at: string | null;
@@ -143,12 +145,16 @@ export type SaveReportContentParams = {
   word_path?: string | null;
   pdf_path?: string | null;
   model_path?: string | null;
+  chief_approval_path?: string | null;
 };
 
 export type ListReportsParams = {
   page: number;
   query: string | null;
   status: "all" | ReportStatus | null;
+  report_type?: string | null;
+  submitted_by?: string | null;
+  analyst?: string | null;
 };
 
 
@@ -188,6 +194,7 @@ function normalizeReportSummaryRow(
     word_path: row.word_path as string | null,
     pdf_path: row.pdf_path as string | null,
     model_path: row.model_path as string | null,
+    chief_approval_path: row.chief_approval_path as string | null,
     published_by: row.published_by as string | null,
     published_at: row.published_at as string | null,
     rejection_reason: row.rejection_reason as string | null,
@@ -351,6 +358,37 @@ export async function listReports(
 
   if (params.status && params.status !== "all") {
     queryBuilder = queryBuilder.eq("status", params.status);
+  }
+
+  // Filter by report type
+  if (params.report_type) {
+    queryBuilder = queryBuilder.eq("report_type", params.report_type);
+  }
+
+  // Filter by submitted_by (owner_user_id)
+  if (params.submitted_by) {
+    queryBuilder = queryBuilder.eq("owner_user_id", params.submitted_by);
+  }
+
+  // Filter by analyst (fuzzy search via analyst table, then exact match in reports)
+  if (params.analyst) {
+    const analystSearch = `%${params.analyst.toLowerCase()}%`;
+    const { data: matchingAnalysts } = await supabase
+      .from("analyst")
+      .select("email")
+      .or(`email.ilike.${analystSearch},english_name.ilike.${analystSearch},chinese_name.ilike.${analystSearch}`);
+
+    if (!matchingAnalysts || matchingAnalysts.length === 0) {
+      return ok({
+        items: [],
+        total: 0,
+        page: params.page,
+        totalPages: 0,
+      });
+    }
+
+    const emails = matchingAnalysts.map((a) => a.email);
+    queryBuilder = queryBuilder.overlaps("analyst_emails", emails);
   }
 
   const from = (params.page - 1) * PAGE_SIZE;
@@ -655,6 +693,17 @@ export async function saveReportContent(
     }
   }
 
+  // Step 4: update chief_approval_path
+  if (params.chief_approval_path) {
+    const { error: chiefError } = await supabase
+      .from("report")
+      .update({ chief_approval_path: params.chief_approval_path })
+      .eq("id", params.report_id);
+    if (chiefError) {
+      return err(chiefError.message);
+    }
+  }
+
   return getReportDetail(params.report_id);
 }
 
@@ -742,11 +791,16 @@ export async function getReportDownloadUrl(params: {
 }): Promise<Result<string>> {
   const supabase = await createServerClient();
 
-  // Normalize path: strip leading 'reports/' since from('reports') already includes the bucket
-  const normalizedPath = params.file_path.replace(/^reports\//, "");
+  // Normalize path: strip leading bucket prefix
+  const normalizedPath = params.file_path.replace(/^(reports|system)\//, "");
+
+  // Determine bucket based on path prefix
+  const bucket = params.file_path.startsWith("system/")
+    ? "system"
+    : "reports";
 
   const { data, error } = await supabase.storage
-    .from("reports")
+    .from(bucket)
     .createSignedUrl(normalizedPath, 60 * 5);
 
   if (error || !data?.signedUrl) {

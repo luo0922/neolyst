@@ -38,7 +38,7 @@ function toRow(u: User): UserRow {
   };
 }
 
-async function listAllUsersCapped() {
+export async function listAllUsersCapped() {
   const supabase = createAdminClient();
 
   const all: User[] = [];

@@ -339,6 +339,7 @@ function toSavePayload(input: {
   word_path?: string | null;
   pdf_path?: string | null;
   model_path?: string | null;
+  chief_approval_path?: string | null;
   fallback?: Partial<ReportDetail>;
 }) {
   return {
@@ -383,6 +384,10 @@ function toSavePayload(input: {
       input.model_path === undefined
         ? (input.fallback?.model_path ?? null)
         : (input.model_path ?? null),
+    chief_approval_path:
+      input.chief_approval_path === undefined
+        ? (input.fallback?.chief_approval_path ?? null)
+        : (input.chief_approval_path ?? null),
   };
 }
 
@@ -398,6 +403,9 @@ export async function listReportsAction(input: {
   page?: number;
   query?: string | null;
   status?: ReportStatus | null;
+  report_type?: string | null;
+  submitted_by?: string | null;
+  analyst?: string | null;
 }): Promise<
   Result<{
     items: Awaited<ReturnType<typeof listReports>> extends Result<infer T>
@@ -425,6 +433,9 @@ export async function listReportsAction(input: {
     page,
     query,
     status: appliedStatus,
+    report_type: input.report_type ?? null,
+    submitted_by: input.submitted_by ?? null,
+    analyst: input.analyst ?? null,
   });
 
   if (!listResult.ok) {
@@ -594,6 +605,7 @@ export async function saveReportContentAction(
     word_path: payload.word_path,
     pdf_path: payload.pdf_path,
     model_path: payload.model_path,
+    chief_approval_path: payload.chief_approval_path,
   });
 
   if (saveResult.ok) {
@@ -750,6 +762,7 @@ export async function directSubmitReportAction(
       word_path: payload.word_path,
       pdf_path: payload.pdf_path,
       model_path: payload.model_path,
+      chief_approval_path: payload.chief_approval_path,
     });
 
     if (!saveResult.ok) {
@@ -821,7 +834,6 @@ export type StorageUploadResult =
 /**
  * Upload report file to storage.
  * New schema: no version numbers. Path format: reports/{reportId}/{category}/{timestamp}_{filename}
- * chief-approval label removed.
  */
 export async function uploadReportFileAction(
   formData: FormData,

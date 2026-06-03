@@ -37,6 +37,7 @@ import {
   validateUploadExtension,
   validateWordPptExtension,
   validatePdfExtension,
+  validateImageExtension,
 } from "@/features/reports/file-utils";
 
 const LANGUAGE_OPTIONS: { value: ReportLanguage; label: string }[] = [
@@ -190,6 +191,7 @@ export function EditReportPageClient({
   const [reportFile, setReportFile] = React.useState<File | null>(null);
   const [pdfFile, setPdfFile] = React.useState<File | null>(null);
   const [modelFile, setModelFile] = React.useState<File | null>(null);
+  const [chiefApprovalFile, setChiefApprovalFile] = React.useState<File | null>(null);
 
   React.useEffect(() => {
     if (!reportTypes.includes(formReportType) && reportTypes.length > 0) {
@@ -289,6 +291,7 @@ export function EditReportPageClient({
           word_path: string | null;
           pdf_path: string | null;
           model_path: string | null;
+          chief_approval_path: string | null;
         };
       }
     | { ok: false; error: string }
@@ -298,6 +301,7 @@ export function EditReportPageClient({
     let wordPath: string | null = activeReport?.word_path ?? null;
     let pdfPath: string | null = activeReport?.pdf_path ?? null;
     let modelPath: string | null = activeReport?.model_path ?? null;
+    let chiefApprovalPath: string | null = activeReport?.chief_approval_path ?? null;
 
     // Upload Word/PPT file
     if (reportFile) {
@@ -356,12 +360,32 @@ export function EditReportPageClient({
       modelPath = result.file_path;
     }
 
+    // Upload Chief Approval file
+    if (chiefApprovalFile) {
+      const check = validateImageExtension(chiefApprovalFile.name);
+      if (!check.ok) {
+        return { ok: false, error: check.error };
+      }
+
+      const fd = new FormData();
+      fd.append("file", chiefApprovalFile);
+      fd.append("reportId", reportId);
+      fd.append("label", "chief-approval");
+
+      const result = await uploadReportFileAction(fd);
+      if (!result.ok) {
+        return { ok: false, error: result.error };
+      }
+      chiefApprovalPath = result.file_path;
+    }
+
     return {
       ok: true,
       data: {
         word_path: wordPath,
         pdf_path: pdfPath,
         model_path: modelPath,
+        chief_approval_path: chiefApprovalPath,
       },
     };
   }
@@ -401,6 +425,7 @@ export function EditReportPageClient({
         word_path: uploadResult.data.word_path,
         pdf_path: uploadResult.data.pdf_path,
         model_path: uploadResult.data.model_path,
+        chief_approval_path: uploadResult.data.chief_approval_path,
       });
 
       if (!saveResult.ok) {
@@ -426,6 +451,7 @@ export function EditReportPageClient({
       setReportFile(null);
       setPdfFile(null);
       setModelFile(null);
+      setChiefApprovalFile(null);
       toast.success("Draft saved.", { title: "Success" });
       router.refresh();
     } finally {
@@ -492,6 +518,7 @@ export function EditReportPageClient({
         word_path: uploadResult.data.word_path,
         pdf_path: uploadResult.data.pdf_path,
         model_path: uploadResult.data.model_path,
+        chief_approval_path: uploadResult.data.chief_approval_path,
       });
 
       if (!directResult.ok) {
@@ -503,6 +530,7 @@ export function EditReportPageClient({
       setReportFile(null);
       setPdfFile(null);
       setModelFile(null);
+      setChiefApprovalFile(null);
       toast.success("Report submitted.", { title: "Success" });
       router.push("/reports");
       router.refresh();
@@ -536,6 +564,11 @@ export function EditReportPageClient({
     } catch {
       window.open(result.data, "_blank", "noopener,noreferrer");
     }
+  }
+
+  // Helper to get chief_approval_path with fallback to current report
+  function getChiefApprovalPath(item: ReportDetail["status_logs"][number]): string | null {
+    return item.metadata.chief_approval_path ?? activeReport.chief_approval_path ?? null;
   }
 
   return (
@@ -774,7 +807,8 @@ export function EditReportPageClient({
           {/* Existing Files */}
           {activeReport.word_path ||
           activeReport.pdf_path ||
-          activeReport.model_path ? (
+          activeReport.model_path ||
+          activeReport.chief_approval_path ? (
             <div className="space-y-2">
               {activeReport.word_path ? (
                 <div className="rounded-[8px] border border-[var(--border-subtle)] bg-[var(--bg-surface-hover)]/40 p-3">
@@ -865,6 +899,36 @@ export function EditReportPageClient({
                   </button>
                 </div>
               ) : null}
+
+              {activeReport.chief_approval_path ? (
+                <div className="rounded-[8px] border border-[var(--border-subtle)] bg-[var(--bg-surface-hover)]/40 p-3">
+                  <button
+                    type="button"
+                    className="flex items-center gap-2 text-sm text-blue-500 hover:underline"
+                    onClick={() =>
+                      handleDownload(
+                        activeReport.chief_approval_path!,
+                        activeReport.chief_approval_path!.split("/").pop() ?? "chief-approval",
+                      )
+                    }
+                  >
+                    <svg
+                      className="h-4 w-4"
+                      fill="none"
+                      stroke="currentColor"
+                      viewBox="0 0 24 24"
+                    >
+                      <path
+                        strokeLinecap="round"
+                        strokeLinejoin="round"
+                        strokeWidth={2}
+                        d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"
+                      />
+                    </svg>
+                    {activeReport.chief_approval_path.split("/").pop()}
+                  </button>
+                </div>
+              ) : null}
             </div>
           ) : null}
 
@@ -899,6 +963,15 @@ export function EditReportPageClient({
                 : "Optional for non-Company reports"
             }
           />
+
+          <FileDropzone
+            label="Chief Approval"
+            accept=".jpg,.jpeg,.png,.gif,.webp,.bmp"
+            file={chiefApprovalFile}
+            onFileChange={setChiefApprovalFile}
+            disabled={!canEdit}
+            hint="Optional image file for chief approval"
+          />
         </section>
 
         {/* Status History Section */}
@@ -930,7 +1003,7 @@ export function EditReportPageClient({
                       Note: {item.reason}
                     </div>
                   ) : null}
-                  {(item.metadata.word_path || item.metadata.pdf_path || item.metadata.model_path) ? (
+                  {(item.metadata.word_path || item.metadata.pdf_path || item.metadata.model_path || getChiefApprovalPath(item)) ? (
                     <div className="mt-2 space-y-1">
                       {item.metadata.word_path ? (
                         <button
@@ -966,6 +1039,21 @@ export function EditReportPageClient({
                             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
                           </svg>
                           {item.metadata.model_path.split("/").pop()}
+                        </button>
+                      ) : null}
+                      {getChiefApprovalPath(item) ? (
+                        <button
+                          type="button"
+                          className="flex items-center gap-1 text-xs text-blue-500 hover:underline"
+                          onClick={() => {
+                            const path = getChiefApprovalPath(item)!;
+                            handleDownload(path, path.split("/").pop() ?? "chief-approval");
+                          }}
+                        >
+                          <svg className="h-3 w-3 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+                          </svg>
+                          {getChiefApprovalPath(item)!.split("/").pop()}
                         </button>
                       ) : null}
                     </div>
