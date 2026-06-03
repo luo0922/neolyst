@@ -102,7 +102,7 @@ export async function listSectors(params: {
 }): Promise<Result<PaginatedList<Sector>>> {
   const supabase = await createServerClient();
 
-  let queryBuilder = supabase.from("sector").select("*", { count: "exact" });
+  let queryBuilder = supabase.from("sector").select("*");
 
   // Apply search filter
   if (params.query) {
@@ -126,7 +126,21 @@ export async function listSectors(params: {
     .order("name_en", { ascending: true })
     .range(from, to);
 
-  const { data, error, count } = await queryBuilder;
+  // Get count
+  let countQuery = supabase.from("sector").select("*", { count: "exact" });
+  if (params.query) {
+    const searchTerm = `%${params.query}%`;
+    countQuery = countQuery.or(
+      `name_en.ilike.${searchTerm},name_cn.ilike.${searchTerm}`,
+    );
+  }
+  if (params.level) {
+    countQuery = countQuery.eq("level", params.level);
+  }
+
+  const { count } = await countQuery;
+
+  const { data, error } = await queryBuilder;
 
   if (error) return err(error.message);
   if (!data) return err("Failed to fetch sectors");

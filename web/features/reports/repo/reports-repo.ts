@@ -349,7 +349,7 @@ export async function listReports(
   // No FK from report.lead_analyst_email to analyst — join is done in JS below
   let queryBuilder = supabase
     .from("report")
-    .select("*", { count: "exact" });
+    .select("*");
 
   if (params.query) {
     const term = `%${params.query}%`;
@@ -371,6 +371,7 @@ export async function listReports(
   }
 
   // Filter by analyst (fuzzy search via analyst table, then exact match in reports)
+  let matchedEmails: string[] = [];
   if (params.analyst) {
     const analystSearch = `%${params.analyst.toLowerCase()}%`;
     const { data: matchingAnalysts } = await supabase
@@ -387,22 +388,47 @@ export async function listReports(
       });
     }
 
-    const emails = matchingAnalysts.map((a) => a.email);
-    queryBuilder = queryBuilder.overlaps("analyst_emails", emails);
+    matchedEmails = matchingAnalysts.map((a) => a.email);
+    queryBuilder = queryBuilder.overlaps("analyst_emails", matchedEmails);
   }
+
+  // Build count query
+  let countQuery = supabase.from("report").select("*", { count: "exact" });
+
+  if (params.query) {
+    const term = `%${params.query}%`;
+    countQuery = countQuery.ilike("title", term);
+  }
+
+  if (params.status && params.status !== "all") {
+    countQuery = countQuery.eq("status", params.status);
+  }
+
+  if (params.report_type) {
+    countQuery = countQuery.eq("report_type", params.report_type);
+  }
+
+  if (params.submitted_by) {
+    countQuery = countQuery.eq("owner_user_id", params.submitted_by);
+  }
+
+  if (matchedEmails.length > 0) {
+    countQuery = countQuery.overlaps("analyst_emails", matchedEmails);
+  }
+
+  const { count } = await countQuery;
+  const total = count ?? 0;
 
   const from = (params.page - 1) * PAGE_SIZE;
   const to = from + PAGE_SIZE - 1;
 
-  const { data, error, count } = await queryBuilder
+  const { data, error } = await queryBuilder
     .order("updated_at", { ascending: false })
     .range(from, to);
 
   if (error) {
     return err(error.message);
   }
-
-  const total = count ?? 0;
 
   // Batch-fetch analysts by email (no FK, so JS-side join)
   const allEmails = [

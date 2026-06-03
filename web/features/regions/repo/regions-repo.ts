@@ -27,7 +27,7 @@ export async function listRegions(params: {
 }): Promise<Result<PaginatedList<Region>>> {
   const supabase = await createServerClient();
 
-  let query = supabase.from("region").select("*", { count: "exact" });
+  let query = supabase.from("region").select("*");
 
   // Apply search filter
   if (params.query) {
@@ -41,7 +41,16 @@ export async function listRegions(params: {
 
   query = query.order("created_at", { ascending: false }).range(from, to);
 
-  const { data, error, count } = await query;
+  // Get count
+  const countQuery = supabase.from("region").select("*", { count: "exact" });
+  if (params.query) {
+    const searchTerm = `%${params.query}%`;
+    countQuery.or(`name_en.ilike.${searchTerm},name_cn.ilike.${searchTerm},code.ilike.${searchTerm}`);
+  }
+
+  const { count } = await countQuery;
+
+  const { data, error } = await query;
 
   if (error) return err(error.message);
   if (!data) return err("Failed to fetch regions");

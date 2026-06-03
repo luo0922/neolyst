@@ -71,7 +71,7 @@ export async function listCoverages(params: {
 
   let queryBuilder = supabase
     .from("coverage")
-    .select("*", { count: "exact" });
+    .select("*");
 
   if (params.query) {
     const searchTerm = `%${params.query}%`;
@@ -124,8 +124,27 @@ export async function listCoverages(params: {
     queryBuilder = queryBuilder.in("id", matchedCoverageIds);
   }
 
-  // Get total count for pagination
-  const { count } = await queryBuilder.select("*", { count: "exact" });
+  // Build count query
+  const countQuery = supabase
+    .from("coverage")
+    .select("*", { count: "exact" });
+
+  if (params.query) {
+    const searchTerm = `%${params.query}%`;
+    countQuery.or(
+      `ticker.ilike.${searchTerm},english_name.ilike.${searchTerm},chinese_name.ilike.${searchTerm}`,
+    );
+  }
+
+  if (params.sector_id) {
+    countQuery.eq("sector_id", params.sector_id);
+  }
+
+  if (matchedCoverageIds) {
+    countQuery.in("id", matchedCoverageIds);
+  }
+
+  const { count } = await countQuery;
   const total = count ?? 0;
   const totalPages = Math.ceil(total / PAGE_SIZE);
 

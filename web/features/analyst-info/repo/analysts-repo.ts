@@ -40,7 +40,7 @@ export async function listAnalysts(params: {
 
   let query = supabase
     .from("analyst")
-    .select("*", { count: "exact" });
+    .select("*");
 
   if (params.query) {
     const searchTerm = `%${params.query}%`;
@@ -52,15 +52,28 @@ export async function listAnalysts(params: {
   const from = (params.page - 1) * PAGE_SIZE;
   const to = from + PAGE_SIZE - 1;
 
-  const { data, error, count } = await query
+  // Get count
+  const countQuery = supabase
+    .from("analyst")
+    .select("*", { count: "exact" });
+
+  if (params.query) {
+    const searchTerm = `%${params.query}%`;
+    countQuery.or(
+      `english_name.ilike.${searchTerm},chinese_name.ilike.${searchTerm},email.ilike.${searchTerm}`,
+    );
+  }
+
+  const { count } = await countQuery;
+  const total = count ?? 0;
+  const totalPages = Math.ceil(total / PAGE_SIZE);
+
+  const { data, error } = await query
     .order("created_at", { ascending: false })
     .range(from, to);
 
   if (error) return err(error.message);
   if (!data) return err("Failed to fetch analysts");
-
-  const total = count ?? 0;
-  const totalPages = Math.ceil(total / PAGE_SIZE);
 
   // JS-side region join
   const regionCodes = [
