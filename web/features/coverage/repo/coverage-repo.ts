@@ -125,7 +125,7 @@ export async function listCoverages(params: {
   }
 
   // Get total count for pagination
-  const { count } = await queryBuilder.select("*", { count: "exact", head: true });
+  const { count } = await queryBuilder.select("*", { count: "exact" });
   const total = count ?? 0;
   const totalPages = Math.ceil(total / PAGE_SIZE);
 
