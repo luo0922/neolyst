@@ -3,6 +3,7 @@ import * as React from "react";
 import { listAllActiveAnalysts } from "@/features/analyst-info/repo/analysts-repo";
 import type { Analyst } from "@/features/analyst-info/repo/analysts-repo";
 import { listAllUsersCapped } from "@/features/users/repo/users-admin-repo";
+import type { ReportStatus } from "@/domain/schemas/report";
 
 import { listReportsAction } from "../actions";
 import { ReportsPageClient } from "./reports-page-client";
