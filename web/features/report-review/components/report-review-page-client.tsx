@@ -251,7 +251,7 @@ export function ReportReviewPageClient({
                   { value: "", label: "All users" },
                   ...users.map((u) => ({
                     value: u.id,
-                    label: (u.user_metadata?.full_name as string) || u.email,
+                    label: (u.user_metadata?.full_name as string) || u.email || "",
                   })),
                 ]}
               />
