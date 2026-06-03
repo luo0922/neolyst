@@ -1,8 +1,8 @@
 import * as React from "react";
 
+import { requireAuth } from "@/lib/supabase/server";
 import { listAllActiveAnalysts } from "@/features/analyst-info/repo/analysts-repo";
 import type { Analyst } from "@/features/analyst-info/repo/analysts-repo";
-import { listAllUsersCapped } from "@/features/users/repo/users-admin-repo";
 
 import { listReviewReportsAction } from "../actions";
 import { ReportReviewPageClient } from "./report-review-page-client";
@@ -13,7 +13,7 @@ export interface ReportReviewPageProps {
     query?: string;
     status?: string;
     report_type?: string;
-    submitted_by?: string;
+    contact_person?: string;
     analyst?: string;
   }>;
 }
@@ -28,20 +28,22 @@ export async function ReportReviewPage({ searchParams }: ReportReviewPageProps) 
     ? (params.status as "all" | "submitted" | "published" | "rejected" | "terminated")
     : "all";
   const report_type = params.report_type?.trim() || null;
-  const submitted_by = params.submitted_by?.trim() || null;
+  const contact_person = params.contact_person?.trim() || null;
   const analyst = params.analyst?.trim() || null;
 
-  const [listResult, analystsResult, usersResult] = await Promise.all([
+  const currentUser = await requireAuth();
+  const currentUserId = currentUser.id;
+
+  const [listResult, analystsResult] = await Promise.all([
     listReviewReportsAction({
       page,
       query,
       status,
       report_type,
-      submitted_by,
+      contact_person,
       analyst,
     }),
     listAllActiveAnalysts(),
-    listAllUsersCapped(),
   ]);
 
   if (!listResult.ok) {
@@ -55,7 +57,6 @@ export async function ReportReviewPage({ searchParams }: ReportReviewPageProps) 
   }
 
   const analysts = analystsResult.ok ? analystsResult.data : [];
-  const users = usersResult.users;
 
   return (
     <ReportReviewPageClient
@@ -66,10 +67,10 @@ export async function ReportReviewPage({ searchParams }: ReportReviewPageProps) 
       currentQuery={query}
       currentStatus={listResult.data.applied_status}
       currentReportType={report_type}
-      currentSubmittedBy={submitted_by}
+      currentSubmittedBy={contact_person}
       currentAnalyst={analyst}
       analysts={analysts}
-      users={users}
+      currentUserId={currentUserId}
     />
   );
 }

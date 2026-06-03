@@ -154,6 +154,7 @@ export type ListReportsParams = {
   status: "all" | ReportStatus | null;
   report_type?: string | null;
   submitted_by?: string | null;
+  contact_person?: string | null;
   analyst?: string | null;
 };
 
@@ -163,7 +164,13 @@ function normalizeReportSummaryRow(
   allAnalystMap: Record<string, Record<string, unknown>>,
 ): ReportSummary {
   const ownerName = (row.owner_name as string | undefined) ?? null;
-  const contactPersonName = (row.contact_person_name as string | undefined) ?? null;
+  const contactPerson = (row.contact_person as string | undefined) ?? null;
+  // Try to get contact_person_name from row, otherwise resolve from analyst map
+  let contactPersonName = (row.contact_person_name as string | undefined) ?? null;
+  if (!contactPersonName && contactPerson) {
+    const analystInfo = allAnalystMap[contactPerson.toLowerCase()];
+    contactPersonName = (analystInfo?.english_name as string | null) ?? null;
+  }
   const analystEmails = (row.analyst_emails as string[] | undefined) ?? [];
 
   const analysts: ReportAnalystEmail[] = analystEmails.map((email, idx) => {
@@ -187,7 +194,7 @@ function normalizeReportSummaryRow(
     target_price: row.target_price != null ? String(row.target_price) : null,
     region_code: row.region_code as string | null,
     report_language: row.report_language as ReportLanguage | null,
-    contact_person: row.contact_person as string | null,
+    contact_person: contactPerson,
     contact_person_name: contactPersonName,
     investment_thesis: row.investment_thesis as string | null,
     status: row.status as ReportStatus,
@@ -370,6 +377,11 @@ export async function listReports(
     queryBuilder = queryBuilder.eq("owner_user_id", params.submitted_by);
   }
 
+  // Filter by contact_person (analyst email)
+  if (params.contact_person) {
+    queryBuilder = queryBuilder.eq("contact_person", params.contact_person);
+  }
+
   // Filter by analyst (fuzzy search via analyst table, then exact match in reports)
   let matchedEmails: string[] = [];
   if (params.analyst) {
@@ -412,6 +424,10 @@ export async function listReports(
     countQuery = countQuery.eq("owner_user_id", params.submitted_by);
   }
 
+  if (params.contact_person) {
+    countQuery = countQuery.eq("contact_person", params.contact_person);
+  }
+
   if (matchedEmails.length > 0) {
     countQuery = countQuery.overlaps("analyst_emails", matchedEmails);
   }
@@ -434,7 +450,10 @@ export async function listReports(
   const allEmails = [
     ...new Set(
       (data ?? [])
-        .flatMap((item: Record<string, unknown>) => (item.analyst_emails as string[]) ?? [])
+        .flatMap((item: Record<string, unknown>) => [
+          ...((item.analyst_emails as string[]) ?? []),
+          item.contact_person as string,
+        ])
         .filter(Boolean),
     ),
   ];

@@ -13,7 +13,6 @@ import { Table, TD, TH, THead, TR } from "@/components/ui/table";
 import type { ReportStatus } from "@/domain/schemas/report";
 import type { ReportSummary } from "@/features/reports/repo/reports-repo";
 import type { Analyst } from "@/features/analyst-info/repo/analysts-repo";
-import type { User } from "@supabase/supabase-js";
 import { terminateReportAction } from "@/features/reports/actions";
 
 const STATUS_OPTIONS: { value: string; label: string }[] = [
@@ -77,7 +76,6 @@ export interface ReportsPageClientProps {
   currentSubmittedBy: string | null;
   currentAnalyst: string | null;
   analysts: Analyst[];
-  users: User[];
   userRole: "admin" | "sa" | "analyst";
   currentUserId: string;
 }
@@ -93,7 +91,6 @@ export function ReportsPageClient({
   currentSubmittedBy,
   currentAnalyst,
   analysts,
-  users,
   userRole,
   currentUserId,
 }: ReportsPageClientProps) {
@@ -126,12 +123,12 @@ export function ReportsPageClient({
     setAnalystFilter(currentAnalyst ?? "");
   }, [currentQuery, currentStatus, currentReportType, currentSubmittedBy, currentAnalyst]);
 
-  function buildQueryString(overrides?: Partial<{ q: string; status: string; page: number; report_type: string; submitted_by: string; analyst: string }>) {
+  function buildQueryString(overrides?: Partial<{ q: string; status: string; page: number; report_type: string; contact_person: string; analyst: string }>) {
     const sp = new URLSearchParams();
     const q = overrides?.q ?? queryDraft;
     const status = overrides?.status ?? statusFilter ?? "all";
     const rt = overrides?.report_type ?? reportTypeFilter;
-    const sb = overrides?.submitted_by ?? submittedByFilter;
+    const cp = overrides?.contact_person ?? submittedByFilter;
     const an = overrides?.analyst ?? analystFilter;
 
     if (q.trim()) {
@@ -143,8 +140,8 @@ export function ReportsPageClient({
     if (rt) {
       sp.set("report_type", rt);
     }
-    if (sb) {
-      sp.set("submitted_by", sb);
+    if (cp) {
+      sp.set("contact_person", cp);
     }
     if (an) {
       sp.set("analyst", an);
@@ -178,7 +175,7 @@ export function ReportsPageClient({
 
   function onSubmittedByChange(value: string) {
     setSubmittedByFilter(value);
-    router.push(`/reports${buildQueryString({ submitted_by: value, page: 1 })}`);
+    router.push(`/reports${buildQueryString({ contact_person: value, page: 1 })}`);
   }
 
   function onAnalystChange(value: string) {
@@ -261,17 +258,17 @@ export function ReportsPageClient({
                 value={submittedByFilter}
                 onChange={(event) => onSubmittedByChange(event.target.value)}
                 options={[
-                  { value: "", label: "All users" },
-                  ...users.map((u) => ({
-                    value: u.id,
-                    label: (u.user_metadata?.full_name as string) || u.email || "",
+                  { value: "", label: "All analysts" },
+                  ...analysts.map((a) => ({
+                    value: a.email,
+                    label: a.english_name ?? a.email,
                   })),
                 ]}
               />
             </div>
             <div className="w-48">
               <Select
-                label="Analyst"
+                label="Analysts"
                 value={analystFilter}
                 onChange={(event) => onAnalystChange(event.target.value)}
                 options={[
@@ -293,6 +290,7 @@ export function ReportsPageClient({
               <TH className="whitespace-nowrap">Type</TH>
               <TH className="whitespace-nowrap">Status</TH>
               <TH className="whitespace-nowrap">Owner</TH>
+              <TH className="whitespace-nowrap">Submitter</TH>
               <TH className="whitespace-nowrap">Analysts</TH>
               <TH className="whitespace-nowrap">Updated</TH>
               <TH className="text-right">Actions</TH>
@@ -301,7 +299,7 @@ export function ReportsPageClient({
           <tbody>
             {reports.length === 0 ? (
               <TR>
-                <TD colSpan={7} className="py-10 text-center text-[var(--fg-secondary)]">
+                <TD colSpan={8} className="py-10 text-center text-[var(--fg-secondary)]">
                   No reports found.
                 </TD>
               </TR>
@@ -319,6 +317,9 @@ export function ReportsPageClient({
                     {report.owner_user_id === currentUserId
                       ? "Me"
                       : report.owner_name ?? `${report.owner_user_id.slice(0, 8)}...`}
+                  </TD>
+                  <TD className="text-[var(--fg-secondary)]">
+                    {report.contact_person_name ?? report.contact_person ?? "-"}
                   </TD>
                   <TD className="text-[var(--fg-secondary)]">
                     {getAnalystNames(report.analysts)}

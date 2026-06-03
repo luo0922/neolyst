@@ -54,7 +54,7 @@ export async function listReviewReportsAction(input: {
   query?: string | null;
   status?: ReviewFilterStatus | null;
   report_type?: string | null;
-  submitted_by?: string | null;
+  contact_person?: string | null;
   analyst?: string | null;
 }): Promise<
   Result<{
@@ -88,7 +88,7 @@ export async function listReviewReportsAction(input: {
     query,
     status,
     report_type: input.report_type ?? null,
-    submitted_by: input.submitted_by ?? null,
+    contact_person: input.contact_person ?? null,
     analyst: input.analyst ?? null,
   });
   if (!result.ok) {

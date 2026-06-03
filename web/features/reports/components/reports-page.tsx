@@ -2,7 +2,6 @@ import * as React from "react";
 
 import { listAllActiveAnalysts } from "@/features/analyst-info/repo/analysts-repo";
 import type { Analyst } from "@/features/analyst-info/repo/analysts-repo";
-import { listAllUsersCapped } from "@/features/users/repo/users-admin-repo";
 import type { ReportStatus } from "@/domain/schemas/report";
 
 import { listReportsAction } from "../actions";
@@ -14,7 +13,7 @@ export interface ReportsPageProps {
     query?: string;
     status?: string;
     report_type?: string;
-    submitted_by?: string;
+    contact_person?: string;
     analyst?: string;
   }>;
   userRole: "admin" | "sa" | "analyst";
@@ -43,13 +42,12 @@ export async function ReportsPage({
       ? (rawStatus as ReportStatus)
       : null;
   const report_type = params.report_type?.trim() || null;
-  const submitted_by = params.submitted_by?.trim() || null;
+  const contact_person = params.contact_person?.trim() || null;
   const analyst = params.analyst?.trim() || null;
 
-  const [listResult, analystsResult, usersResult] = await Promise.all([
-    listReportsAction({ page, query, status, report_type, submitted_by, analyst }),
+  const [listResult, analystsResult] = await Promise.all([
+    listReportsAction({ page, query, status, report_type, contact_person, analyst }),
     listAllActiveAnalysts(),
-    listAllUsersCapped(),
   ]);
 
   if (!listResult.ok) {
@@ -61,7 +59,6 @@ export async function ReportsPage({
   }
 
   const analysts = analystsResult.ok ? analystsResult.data : [];
-  const users = usersResult.users;
 
   return (
     <ReportsPageClient
@@ -72,10 +69,9 @@ export async function ReportsPage({
       currentQuery={query}
       currentStatus={listResult.data.applied_status}
       currentReportType={report_type}
-      currentSubmittedBy={submitted_by}
+      currentSubmittedBy={contact_person}
       currentAnalyst={analyst}
       analysts={analysts}
-      users={users}
       userRole={userRole}
       currentUserId={currentUserId}
     />

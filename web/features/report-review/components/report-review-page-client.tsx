@@ -14,7 +14,6 @@ import type {
   ReportSummary,
 } from "@/features/reports/repo/reports-repo";
 import type { Analyst } from "@/features/analyst-info/repo/analysts-repo";
-import type { User } from "@supabase/supabase-js";
 
 export interface ReportReviewPageClientProps {
   reports: ReportSummary[];
@@ -27,7 +26,7 @@ export interface ReportReviewPageClientProps {
   currentSubmittedBy: string | null;
   currentAnalyst: string | null;
   analysts: Analyst[];
-  users: User[];
+  currentUserId: string;
 }
 
 const FILTER_OPTIONS = [
@@ -45,7 +44,7 @@ function statusTone(status: string): "blue" | "green" | "red" {
   return "red";
 }
 
-function toQueryString(params: { q: string; status: string; page: number; report_type?: string; submitted_by?: string; analyst?: string }) {
+function toQueryString(params: { q: string; status: string; page: number; report_type?: string; submitted_by?: string; contact_person?: string; analyst?: string }) {
   const sp = new URLSearchParams();
   if (params.q.trim()) {
     sp.set("query", params.q.trim());
@@ -58,6 +57,9 @@ function toQueryString(params: { q: string; status: string; page: number; report
   }
   if (params.submitted_by) {
     sp.set("submitted_by", params.submitted_by);
+  }
+  if (params.contact_person) {
+    sp.set("contact_person", params.contact_person);
   }
   if (params.analyst) {
     sp.set("analyst", params.analyst);
@@ -96,7 +98,7 @@ export function ReportReviewPageClient({
   currentSubmittedBy,
   currentAnalyst,
   analysts,
-  users,
+  currentUserId,
 }: ReportReviewPageClientProps) {
   const router = useRouter();
 
@@ -123,12 +125,12 @@ export function ReportReviewPageClient({
     setAnalystFilter(currentAnalyst ?? "");
   }, [currentQuery, currentStatus, currentReportType, currentSubmittedBy, currentAnalyst]);
 
-  function buildQueryString(overrides?: Partial<{ q: string; status: string; page: number; report_type: string; submitted_by: string; analyst: string }>) {
+  function buildQueryString(overrides?: Partial<{ q: string; status: string; page: number; report_type: string; contact_person: string; analyst: string }>) {
     const sp = new URLSearchParams();
     const q = overrides?.q ?? queryDraft;
     const status = overrides?.status ?? statusFilter ?? "all";
     const rt = overrides?.report_type ?? reportTypeFilter;
-    const sb = overrides?.submitted_by ?? submittedByFilter;
+    const cp = overrides?.contact_person ?? submittedByFilter;
     const an = overrides?.analyst ?? analystFilter;
 
     if (q.trim()) {
@@ -140,8 +142,8 @@ export function ReportReviewPageClient({
     if (rt) {
       sp.set("report_type", rt);
     }
-    if (sb) {
-      sp.set("submitted_by", sb);
+    if (cp) {
+      sp.set("contact_person", cp);
     }
     if (an) {
       sp.set("analyst", an);
@@ -179,7 +181,7 @@ export function ReportReviewPageClient({
 
   function onSubmittedByChange(value: string) {
     setSubmittedByFilter(value);
-    router.push(`/report-review${buildQueryString({ submitted_by: value, page: 1 })}`);
+    router.push(`/report-review${buildQueryString({ contact_person: value, page: 1 })}`);
   }
 
   function onAnalystChange(value: string) {
@@ -248,17 +250,17 @@ export function ReportReviewPageClient({
                 value={submittedByFilter}
                 onChange={(event) => onSubmittedByChange(event.target.value)}
                 options={[
-                  { value: "", label: "All users" },
-                  ...users.map((u) => ({
-                    value: u.id,
-                    label: (u.user_metadata?.full_name as string) || u.email || "",
+                  { value: "", label: "All analysts" },
+                  ...analysts.map((a) => ({
+                    value: a.email,
+                    label: a.english_name ?? a.email,
                   })),
                 ]}
               />
             </div>
             <div className="w-48">
               <Select
-                label="Analyst"
+                label="Analysts"
                 value={analystFilter}
                 onChange={(event) => onAnalystChange(event.target.value)}
                 options={[
@@ -274,12 +276,13 @@ export function ReportReviewPageClient({
         </div>
 
         <Table>
-          <THead>
+<THead>
             <TR>
               <TH className="w-full">Title</TH>
               <TH className="whitespace-nowrap">Type</TH>
               <TH className="whitespace-nowrap">Status</TH>
               <TH className="whitespace-nowrap">Owner</TH>
+              <TH className="whitespace-nowrap">Submitter</TH>
               <TH className="whitespace-nowrap">Analysts</TH>
               <TH className="whitespace-nowrap">Updated</TH>
               <TH className="text-right">Action</TH>
@@ -288,7 +291,7 @@ export function ReportReviewPageClient({
           <tbody>
             {reports.length === 0 ? (
               <TR>
-                <TD colSpan={7} className="py-10 text-center text-[var(--fg-secondary)]">
+                <TD colSpan={8} className="py-10 text-center text-[var(--fg-secondary)]">
                   No reports found.
                 </TD>
               </TR>
@@ -302,7 +305,14 @@ export function ReportReviewPageClient({
                       {report.status}
                     </Badge>
                   </TD>
-                  <TD className="text-[var(--fg-secondary)]">{report.owner_name ?? `${report.owner_user_id.slice(0, 8)}...`}</TD>
+                  <TD className="text-[var(--fg-secondary)]">
+                    {report.owner_user_id === currentUserId
+                      ? "Me"
+                      : report.owner_name ?? `${report.owner_user_id.slice(0, 8)}...`}
+                  </TD>
+                  <TD className="text-[var(--fg-secondary)]">
+                    {report.contact_person_name ?? report.contact_person ?? "-"}
+                  </TD>
                   <TD className="text-[var(--fg-secondary)]">
                     {getAnalystNames(report.analysts)}
                   </TD>

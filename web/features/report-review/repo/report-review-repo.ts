@@ -19,7 +19,7 @@ export async function listReviewReports(params: {
   query: string | null;
   status: "all" | "submitted" | "published" | "rejected" | "terminated";
   report_type?: string | null;
-  submitted_by?: string | null;
+  contact_person?: string | null;
   analyst?: string | null;
 }): Promise<
   Result<{
@@ -34,7 +34,7 @@ export async function listReviewReports(params: {
     query: params.query,
     status: params.status,
     report_type: params.report_type,
-    submitted_by: params.submitted_by,
+    contact_person: params.contact_person,
     analyst: params.analyst,
   });
 }
