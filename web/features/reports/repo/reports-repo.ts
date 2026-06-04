@@ -27,6 +27,8 @@ export type ReportStatusLogMetadata = {
   pdf_path: string | null;
   model_path: string | null;
   chief_approval_path: string | null;
+  source_path: string | null;
+  source_filename: string | null;
   [key: string]: unknown;
 };
 
@@ -66,6 +68,9 @@ export type ReportSummary = {
   pdf_path: string | null;
   model_path: string | null;
   chief_approval_path: string | null;
+  // source_path/source_filename: 原始稿信息
+  source_path: string | null;
+  source_filename: string | null;
   // published_by/published_at added
   published_by: string | null;
   published_at: string | null;
@@ -146,6 +151,8 @@ export type SaveReportContentParams = {
   pdf_path?: string | null;
   model_path?: string | null;
   chief_approval_path?: string | null;
+  source_path?: string | null;
+  source_filename?: string | null;
 };
 
 export type ListReportsParams = {
@@ -202,6 +209,8 @@ function normalizeReportSummaryRow(
     pdf_path: row.pdf_path as string | null,
     model_path: row.model_path as string | null,
     chief_approval_path: row.chief_approval_path as string | null,
+    source_path: row.source_path as string | null,
+    source_filename: row.source_filename as string | null,
     published_by: row.published_by as string | null,
     published_at: row.published_at as string | null,
     rejection_reason: row.rejection_reason as string | null,
@@ -746,6 +755,24 @@ export async function saveReportContent(
       .eq("id", params.report_id);
     if (chiefError) {
       return err(chiefError.message);
+    }
+  }
+
+  // Step 5: update source_path and source_filename
+  if (params.source_path !== undefined || params.source_filename !== undefined) {
+    const updateData: Record<string, unknown> = {};
+    if (params.source_path !== undefined) {
+      updateData.source_path = params.source_path;
+    }
+    if (params.source_filename !== undefined) {
+      updateData.source_filename = params.source_filename;
+    }
+    const { error: sourceError } = await supabase
+      .from("report")
+      .update(updateData)
+      .eq("id", params.report_id);
+    if (sourceError) {
+      return err(sourceError.message);
     }
   }
 

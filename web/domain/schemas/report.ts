@@ -17,7 +17,7 @@ export const reportStatuses = [
 ] as const;
 
 export const reportLanguages = ["zh", "en"] as const;
-export const reportFileLabels = ["report", "report-pdf", "model", "chief-approval"] as const;
+export const reportFileLabels = ["report", "report-pdf", "model", "chief-approval", "source"] as const;
 
 export const reportStatusActions = [
   "submit",
@@ -82,6 +82,9 @@ const reportEditableFieldsSchema = z.object({
   pdf_path: z.string().trim().nullable().optional(),
   model_path: z.string().trim().nullable().optional(),
   chief_approval_path: z.string().trim().nullable().optional(),
+  // source_path/source_filename: 原始稿信息
+  source_path: z.string().trim().nullable().optional(),
+  source_filename: z.string().trim().nullable().optional(),
 });
 
 export const reportCreateSchema = reportEditableFieldsSchema.omit({

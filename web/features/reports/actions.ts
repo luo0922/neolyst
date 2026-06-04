@@ -340,6 +340,8 @@ function toSavePayload(input: {
   pdf_path?: string | null;
   model_path?: string | null;
   chief_approval_path?: string | null;
+  source_path?: string | null;
+  source_filename?: string | null;
   fallback?: Partial<ReportDetail>;
 }) {
   return {
@@ -388,6 +390,14 @@ function toSavePayload(input: {
       input.chief_approval_path === undefined
         ? (input.fallback?.chief_approval_path ?? null)
         : (input.chief_approval_path ?? null),
+    source_path:
+      input.source_path === undefined
+        ? (input.fallback?.source_path ?? null)
+        : (input.source_path ?? null),
+    source_filename:
+      input.source_filename === undefined
+        ? (input.fallback?.source_filename ?? null)
+        : (input.source_filename ?? null),
   };
 }
 
@@ -608,6 +618,8 @@ export async function saveReportContentAction(
     pdf_path: payload.pdf_path,
     model_path: payload.model_path,
     chief_approval_path: payload.chief_approval_path,
+    source_path: payload.source_path,
+    source_filename: payload.source_filename,
   });
 
   if (saveResult.ok) {
@@ -765,6 +777,8 @@ export async function directSubmitReportAction(
       pdf_path: payload.pdf_path,
       model_path: payload.model_path,
       chief_approval_path: payload.chief_approval_path,
+      source_path: payload.source_path,
+      source_filename: payload.source_filename,
     });
 
     if (!saveResult.ok) {
@@ -867,16 +881,20 @@ export async function uploadReportFileAction(
     .replace(/:/g, "-");
 
   // Get upload directory from RPC (format: {id}/{label}/{timestamp}/, relative to bucket)
+  // Note: RPC only supports "report" and "model" labels. Other labels use fallback path.
   const supabase = createServiceRoleClient();
-  const { data: dirPrefix, error: dirError } = await supabase.rpc(
-    "generate_upload_path",
-    { p_report_id: reportId, p_file_category: label },
-  );
+  let uploadDir: string;
 
-  // Fallback: RPC may fail for reviewer (submitted status) or unsupported labels (report-pdf)
-  // Construct path locally in the same format: {id}/{label}/{timestamp}/
-  const uploadDir =
-    dirPrefix ?? `${reportId}/${label}/${timestamp}/`;
+  if (label === "report" || label === "model") {
+    const { data: dirPrefix, error: dirError } = await supabase.rpc(
+      "generate_upload_path",
+      { p_report_id: reportId, p_file_category: label },
+    );
+    uploadDir = dirPrefix ?? `${reportId}/${label}/${timestamp}/`;
+  } else {
+    // Fallback for unsupported labels (report-pdf, chief-approval, source, etc.)
+    uploadDir = `${reportId}/${label}/${timestamp}/`;
+  }
 
   // Path: {id}/{label}/{timestamp}/{filename}
   const filePath = `${uploadDir}${safeName}`;

@@ -192,6 +192,7 @@ export function EditReportPageClient({
   const [pdfFile, setPdfFile] = React.useState<File | null>(null);
   const [modelFile, setModelFile] = React.useState<File | null>(null);
   const [chiefApprovalFile, setChiefApprovalFile] = React.useState<File | null>(null);
+  const [sourceFile, setSourceFile] = React.useState<File | null>(null);
 
   React.useEffect(() => {
     if (!reportTypes.includes(formReportType) && reportTypes.length > 0) {
@@ -292,6 +293,8 @@ export function EditReportPageClient({
           pdf_path: string | null;
           model_path: string | null;
           chief_approval_path: string | null;
+          source_path: string | null;
+          source_filename: string | null;
         };
       }
     | { ok: false; error: string }
@@ -302,6 +305,8 @@ export function EditReportPageClient({
     let pdfPath: string | null = activeReport?.pdf_path ?? null;
     let modelPath: string | null = activeReport?.model_path ?? null;
     let chiefApprovalPath: string | null = activeReport?.chief_approval_path ?? null;
+    let sourcePath: string | null = activeReport?.source_path ?? null;
+    let sourceFilename: string | null = activeReport?.source_filename ?? null;
 
     // Upload Word/PPT file
     if (reportFile) {
@@ -379,6 +384,26 @@ export function EditReportPageClient({
       chiefApprovalPath = result.file_path;
     }
 
+    // Upload Source file (original report)
+    if (sourceFile) {
+      const check = validateWordPptExtension(sourceFile.name);
+      if (!check.ok) {
+        return { ok: false, error: check.error };
+      }
+
+      const fd = new FormData();
+      fd.append("file", sourceFile);
+      fd.append("reportId", reportId);
+      fd.append("label", "source");
+
+      const result = await uploadReportFileAction(fd);
+      if (!result.ok) {
+        return { ok: false, error: result.error };
+      }
+      sourcePath = result.file_path;
+      sourceFilename = sourceFile.name; // 保留原始文件名（含中文）
+    }
+
     return {
       ok: true,
       data: {
@@ -386,6 +411,8 @@ export function EditReportPageClient({
         pdf_path: pdfPath,
         model_path: modelPath,
         chief_approval_path: chiefApprovalPath,
+        source_path: sourcePath,
+        source_filename: sourceFilename,
       },
     };
   }
@@ -426,6 +453,8 @@ export function EditReportPageClient({
         pdf_path: uploadResult.data.pdf_path,
         model_path: uploadResult.data.model_path,
         chief_approval_path: uploadResult.data.chief_approval_path,
+        source_path: uploadResult.data.source_path,
+        source_filename: uploadResult.data.source_filename,
       });
 
       if (!saveResult.ok) {
@@ -452,6 +481,7 @@ export function EditReportPageClient({
       setPdfFile(null);
       setModelFile(null);
       setChiefApprovalFile(null);
+      setSourceFile(null);
       toast.success("Draft saved.", { title: "Success" });
       router.refresh();
     } finally {
@@ -519,6 +549,8 @@ export function EditReportPageClient({
         pdf_path: uploadResult.data.pdf_path,
         model_path: uploadResult.data.model_path,
         chief_approval_path: uploadResult.data.chief_approval_path,
+        source_path: uploadResult.data.source_path,
+        source_filename: uploadResult.data.source_filename,
       });
 
       if (!directResult.ok) {
@@ -531,6 +563,7 @@ export function EditReportPageClient({
       setPdfFile(null);
       setModelFile(null);
       setChiefApprovalFile(null);
+      setSourceFile(null);
       toast.success("Report submitted.", { title: "Success" });
       router.push("/reports");
       router.refresh();
@@ -569,6 +602,15 @@ export function EditReportPageClient({
   // Helper to get chief_approval_path with fallback to current report
   function getChiefApprovalPath(item: ReportDetail["status_logs"][number]): string | null {
     return item.metadata.chief_approval_path ?? activeReport.chief_approval_path ?? null;
+  }
+
+  // Helper to get source info with fallback to current report
+  function getSourcePath(item: ReportDetail["status_logs"][number]): string | null {
+    return item.metadata.source_path ?? activeReport.source_path ?? null;
+  }
+
+  function getSourceFilename(item: ReportDetail["status_logs"][number]): string | null {
+    return item.metadata.source_filename ?? activeReport.source_filename ?? null;
   }
 
   return (
@@ -808,8 +850,40 @@ export function EditReportPageClient({
           {activeReport.word_path ||
           activeReport.pdf_path ||
           activeReport.model_path ||
-          activeReport.chief_approval_path ? (
+          activeReport.chief_approval_path ||
+          activeReport.source_path ? (
             <div className="space-y-2">
+              {/* Source File - 显示在最上面 */}
+              {activeReport.source_path ? (
+                <div className="rounded-[8px] border border-[var(--border-subtle)] bg-[var(--bg-surface-hover)]/40 p-3">
+                  <button
+                    type="button"
+                    className="flex items-center gap-2 text-sm text-blue-500 hover:underline"
+                    onClick={() =>
+                      handleDownload(
+                        activeReport.source_path!,
+                        activeReport.source_filename ?? activeReport.source_path!.split("/").pop() ?? "source",
+                      )
+                    }
+                  >
+                    <svg
+                      className="h-4 w-4"
+                      fill="none"
+                      stroke="currentColor"
+                      viewBox="0 0 24 24"
+                    >
+                      <path
+                        strokeLinecap="round"
+                        strokeLinejoin="round"
+                        strokeWidth={2}
+                        d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"
+                      />
+                    </svg>
+                    {activeReport.source_filename ?? activeReport.source_path!.split("/").pop()}
+                  </button>
+                </div>
+              ) : null}
+
               {activeReport.word_path ? (
                 <div className="rounded-[8px] border border-[var(--border-subtle)] bg-[var(--bg-surface-hover)]/40 p-3">
                   <button
@@ -965,6 +1039,15 @@ export function EditReportPageClient({
           />
 
           <FileDropzone
+            label="Source File (Original Report)"
+            accept=".doc,.docx,.ppt,.pptx"
+            file={sourceFile}
+            onFileChange={setSourceFile}
+            disabled={!canEdit}
+            hint="Original report file (Word/PPT). Filename with Chinese characters will be preserved for download."
+          />
+
+          <FileDropzone
             label="Chief Approval"
             accept=".jpg,.jpeg,.png,.gif,.webp,.bmp"
             file={chiefApprovalFile}
@@ -1003,8 +1086,25 @@ export function EditReportPageClient({
                       Note: {item.reason}
                     </div>
                   ) : null}
-                  {(item.metadata.word_path || item.metadata.pdf_path || item.metadata.model_path || getChiefApprovalPath(item)) ? (
+                  {(item.metadata.word_path || item.metadata.pdf_path || item.metadata.model_path || getChiefApprovalPath(item) || getSourcePath(item)) ? (
                     <div className="mt-2 space-y-1">
+                      {/* 显示当前 report 的 source 信息（draft -> submitted 节点优先显示当前值） */}
+                  {getSourcePath(item) ? (
+                    <button
+                      type="button"
+                      className="flex items-center gap-1 text-xs text-blue-500 hover:underline"
+                      onClick={() => {
+                        const path = getSourcePath(item)!;
+                        const filename = getSourceFilename(item) ?? path.split("/").pop() ?? "source";
+                        handleDownload(path, filename);
+                      }}
+                    >
+                      <svg className="h-3 w-3 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+                      </svg>
+                      {getSourceFilename(item) ?? getSourcePath(item)!.split("/").pop()}
+                    </button>
+                  ) : null}
                       {item.metadata.word_path ? (
                         <button
                           type="button"
