@@ -84,6 +84,8 @@ export type ReportSummary = {
   created_at: string;
   updated_at: string;
   analysts: ReportAnalystEmail[];
+  // translated_from_report_id: 如果报告是翻译版本，此字段关联原版报告的ID
+  translated_from_report_id: string | null;
 };
 
 export type ReportDetail = ReportSummary & {
@@ -221,6 +223,7 @@ function normalizeReportSummaryRow(
     created_at: row.created_at as string,
     updated_at: row.updated_at as string,
     analysts,
+    translated_from_report_id: row.translated_from_report_id as string | null,
   };
 }
 

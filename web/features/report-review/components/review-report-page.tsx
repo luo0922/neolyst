@@ -477,6 +477,27 @@ export function ReviewReportPage({
             />
           </div>
 
+          {detail?.translated_from_report_id && (
+            <div className="mt-4 text-sm text-[var(--fg-secondary)]">
+              This report is a translation. To view the original version, please{" "}
+              <button
+                type="button"
+                onClick={() => {
+                  const baseUrl = window.location.origin;
+                  window.open(
+                    `${baseUrl}/report-review/${detail.translated_from_report_id}`,
+                    "_blank",
+                    "noopener,noreferrer"
+                  );
+                }}
+                className="text-blue-500 hover:underline"
+              >
+                click the link
+              </button>
+              .
+            </div>
+          )}
+
           {/* Analysts Section */}
           <div className="mt-4">
             <div className="mb-2 text-sm font-medium text-[var(--fg-primary)]">

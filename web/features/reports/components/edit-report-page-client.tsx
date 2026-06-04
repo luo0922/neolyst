@@ -838,6 +838,27 @@ export function EditReportPageClient({
             minHeight="150px"
             readOnly={!canEdit}
           />
+
+          {activeReport.translated_from_report_id && (
+            <div className="mt-4 text-sm text-[var(--fg-secondary)]">
+              This report is a translation. To view the original version, please{" "}
+              <button
+                type="button"
+                onClick={() => {
+                  const baseUrl = window.location.origin;
+                  window.open(
+                    `${baseUrl}/reports/${activeReport.translated_from_report_id}/edit`,
+                    "_blank",
+                    "noopener,noreferrer"
+                  );
+                }}
+                className="text-blue-500 hover:underline"
+              >
+                click the link
+              </button>
+              .
+            </div>
+          )}
         </section>
 
         {/* Report Files Section */}
