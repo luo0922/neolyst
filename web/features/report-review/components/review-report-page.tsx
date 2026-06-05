@@ -17,7 +17,11 @@ import {
   getReportDownloadUrlAction,
   uploadReportFileAction,
 } from "@/features/reports/actions";
-import { validatePdfExtension, validateWordPptExtension } from "@/features/reports/file-utils";
+import {
+  validateImageExtension,
+  validatePdfExtension,
+  validateWordPptExtension,
+} from "@/features/reports/file-utils";
 
 import {
   executeReviewAction,
@@ -61,6 +65,7 @@ export function ReviewReportPage({
   const [pdfFile, setPdfFile] = React.useState<File | null>(null);
   const [modelFile, setModelFile] = React.useState<File | null>(null);
   const [sourceFile, setSourceFile] = React.useState<File | null>(null);
+  const [chiefApprovalFile, setChiefApprovalFile] = React.useState<File | null>(null);
   const [rejectReason, setRejectReason] = React.useState("");
   const [actionLoading, setActionLoading] = React.useState(false);
 
@@ -140,6 +145,11 @@ export function ReviewReportPage({
     return item.metadata.source_filename ?? detail?.source_filename ?? null;
   }
 
+  // Helper to get chief_approval_path with fallback to current report
+  function getChiefApprovalPath(item: ReportDetail["status_logs"][number]): string | null {
+    return item.metadata.chief_approval_path ?? detail?.chief_approval_path ?? null;
+  }
+
   function updateAnalyst(index: number, analystEmail: string) {
     setFormAnalysts((prev) => {
       const next = [...prev];
@@ -185,19 +195,21 @@ export function ReviewReportPage({
     model_path: string | null;
     source_path: string | null;
     source_filename: string | null;
+    chief_approval_path: string | null;
   }> {
     let wordPath: string | null = detail?.word_path ?? null;
     let pdfPath: string | null = detail?.pdf_path ?? null;
     const modelPath: string | null = detail?.model_path ?? null;
     let sourcePath: string | null = detail?.source_path ?? null;
     let sourceFilename: string | null = detail?.source_filename ?? null;
+    let chiefApprovalPath: string | null = detail?.chief_approval_path ?? null;
 
     // Upload Word/PPT file
     if (reportFile) {
       const check = validateWordPptExtension(reportFile.name);
       if (!check.ok) {
         toast.error(check.error, { title: "Validation Error" });
-        return { word_path: null, pdf_path: null, model_path: null, source_path: null, source_filename: null };
+        return { word_path: null, pdf_path: null, model_path: null, source_path: null, source_filename: null, chief_approval_path: null };
       }
 
       const fd = new FormData();
@@ -208,7 +220,7 @@ export function ReviewReportPage({
       const result = await uploadReportFileAction(fd);
       if (!result.ok) {
         toast.error(result.error, { title: "Upload Error" });
-        return { word_path: null, pdf_path: null, model_path: null, source_path: null, source_filename: null };
+        return { word_path: null, pdf_path: null, model_path: null, source_path: null, source_filename: null, chief_approval_path: null };
       }
       wordPath = result.file_path;
     }
@@ -218,7 +230,7 @@ export function ReviewReportPage({
       const check = validatePdfExtension(pdfFile.name);
       if (!check.ok) {
         toast.error(check.error, { title: "Validation Error" });
-        return { word_path: null, pdf_path: null, model_path: null, source_path: null, source_filename: null };
+        return { word_path: null, pdf_path: null, model_path: null, source_path: null, source_filename: null, chief_approval_path: null };
       }
 
       const fd = new FormData();
@@ -229,7 +241,7 @@ export function ReviewReportPage({
       const result = await uploadReportFileAction(fd);
       if (!result.ok) {
         toast.error(result.error, { title: "Upload Error" });
-        return { word_path: null, pdf_path: null, model_path: null, source_path: null, source_filename: null };
+        return { word_path: null, pdf_path: null, model_path: null, source_path: null, source_filename: null, chief_approval_path: null };
       }
       pdfPath = result.file_path;
     }
@@ -239,7 +251,7 @@ export function ReviewReportPage({
       const check = validateWordPptExtension(sourceFile.name);
       if (!check.ok) {
         toast.error(check.error, { title: "Validation Error" });
-        return { word_path: null, pdf_path: null, model_path: null, source_path: null, source_filename: null };
+        return { word_path: null, pdf_path: null, model_path: null, source_path: null, source_filename: null, chief_approval_path: null };
       }
 
       const fd = new FormData();
@@ -250,10 +262,31 @@ export function ReviewReportPage({
       const result = await uploadReportFileAction(fd);
       if (!result.ok) {
         toast.error(result.error, { title: "Upload Error" });
-        return { word_path: null, pdf_path: null, model_path: null, source_path: null, source_filename: null };
+        return { word_path: null, pdf_path: null, model_path: null, source_path: null, source_filename: null, chief_approval_path: null };
       }
       sourcePath = result.file_path;
       sourceFilename = sourceFile.name; // 保留原始文件名（含中文）
+    }
+
+    // Upload Chief Approval file
+    if (chiefApprovalFile) {
+      const check = validateImageExtension(chiefApprovalFile.name);
+      if (!check.ok) {
+        toast.error(check.error, { title: "Validation Error" });
+        return { word_path: null, pdf_path: null, model_path: null, source_path: null, source_filename: null, chief_approval_path: null };
+      }
+
+      const fd = new FormData();
+      fd.append("file", chiefApprovalFile);
+      fd.append("reportId", detail!.id);
+      fd.append("label", "chief-approval");
+
+      const result = await uploadReportFileAction(fd);
+      if (!result.ok) {
+        toast.error(result.error, { title: "Upload Error" });
+        return { word_path: null, pdf_path: null, model_path: null, source_path: null, source_filename: null, chief_approval_path: null };
+      }
+      chiefApprovalPath = result.file_path;
     }
 
     return {
@@ -262,6 +295,7 @@ export function ReviewReportPage({
       model_path: modelPath,
       source_path: sourcePath,
       source_filename: sourceFilename,
+      chief_approval_path: chiefApprovalPath,
     };
   }
 
@@ -290,6 +324,7 @@ export function ReviewReportPage({
       reportFile ||
       pdfFile ||
       sourceFile ||
+      chiefApprovalFile ||
       formTitle !== detail.title ||
       formInvestmentThesis !== (detail.investment_thesis ?? "");
 
@@ -323,6 +358,7 @@ export function ReviewReportPage({
         model_path: uploadResult.model_path,
         source_path: uploadResult.source_path,
         source_filename: uploadResult.source_filename,
+        chief_approval_path: uploadResult.chief_approval_path,
       });
 
       if (!saveResult.ok) {
@@ -335,6 +371,7 @@ export function ReviewReportPage({
       setReportFile(null);
       setPdfFile(null);
       setSourceFile(null);
+      setChiefApprovalFile(null);
     }
 
     const payload =
@@ -780,6 +817,56 @@ export function ReviewReportPage({
               </div>
             ) : null}
 
+            {/* Existing Chief Approval File - placed at the bottom (matching Analyst Revise) */}
+            {(detail.chief_approval_path || chiefApprovalFile) ? (
+              <div className="rounded-[8px] border border-[var(--border-subtle)] bg-[var(--bg-surface-hover)]/40 p-3">
+                {chiefApprovalFile ? (
+                  <div className="flex items-center gap-2 text-sm text-green-600">
+                    <svg
+                      className="h-4 w-4"
+                      fill="none"
+                      stroke="currentColor"
+                      viewBox="0 0 24 24"
+                    >
+                      <path
+                        strokeLinecap="round"
+                        strokeLinejoin="round"
+                        strokeWidth={2}
+                        d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"
+                      />
+                    </svg>
+                    Selected: {chiefApprovalFile.name}
+                  </div>
+                ) : detail.chief_approval_path ? (
+                  <button
+                    type="button"
+                    className="flex items-center gap-2 text-sm text-blue-500 hover:underline"
+                    onClick={() =>
+                      handleDownload(
+                        detail.chief_approval_path!,
+                        detail.chief_approval_path!.split("/").pop() ?? "chief-approval",
+                      )
+                    }
+                  >
+                    <svg
+                      className="h-4 w-4"
+                      fill="none"
+                      stroke="currentColor"
+                      viewBox="0 0 24 24"
+                    >
+                      <path
+                        strokeLinecap="round"
+                        strokeLinejoin="round"
+                        strokeWidth={2}
+                        d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z"
+                      />
+                    </svg>
+                    {detail.chief_approval_path.split("/").pop()}
+                  </button>
+                ) : null}
+              </div>
+            ) : null}
+
             <FileDropzone
               label="Report File (Word/PPT)"
               accept=".doc,.docx,.ppt,.pptx"
@@ -810,6 +897,14 @@ export function ReviewReportPage({
               file={sourceFile}
               onFileChange={setSourceFile}
               hint="Original report file (Word/PPT). Filename with Chinese characters will be preserved for download."
+            />
+
+            <FileDropzone
+              label="Chief Approval"
+              accept=".jpg,.jpeg,.png,.gif,.webp,.bmp"
+              file={chiefApprovalFile}
+              onFileChange={setChiefApprovalFile}
+              hint="Optional image file for chief approval"
             />
           </div>
         </section>
@@ -843,7 +938,7 @@ export function ReviewReportPage({
                       Note: {item.reason}
                     </div>
                   ) : null}
-                  {(item.metadata.word_path || item.metadata.pdf_path || item.metadata.model_path || getSourcePath(item)) ? (
+                  {(item.metadata.word_path || item.metadata.pdf_path || item.metadata.model_path || getSourcePath(item) || getChiefApprovalPath(item)) ? (
                     <div className="mt-2 space-y-1">
                       {/* Source file (current report fallback) */}
                       {getSourcePath(item) ? (
@@ -896,6 +991,21 @@ export function ReviewReportPage({
                             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
                           </svg>
                           {item.metadata.model_path.split("/").pop()}
+                        </button>
+                      ) : null}
+                      {getChiefApprovalPath(item) ? (
+                        <button
+                          type="button"
+                          className="flex items-center gap-1 text-xs text-blue-500 hover:underline"
+                          onClick={() => {
+                            const path = getChiefApprovalPath(item)!;
+                            handleDownload(path, path.split("/").pop() ?? "chief-approval");
+                          }}
+                        >
+                          <svg className="h-3 w-3 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" />
+                          </svg>
+                          {getChiefApprovalPath(item)!.split("/").pop()}
                         </button>
                       ) : null}
                     </div>
