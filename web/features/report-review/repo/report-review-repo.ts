@@ -95,6 +95,8 @@ export async function saveReviewReportContent(params: {
   pdf_path?: string | null;
   model_path?: string | null;
   chief_approval_path?: string | null;
+  source_path?: string | null;
+  source_filename?: string | null;
 }): Promise<Result<ReportDetail>> {
   const supabase = await createServerClient();
 
@@ -121,6 +123,12 @@ export async function saveReviewReportContent(params: {
   }
   if (params.chief_approval_path) {
     updateData.chief_approval_path = params.chief_approval_path;
+  }
+  if (params.source_path !== undefined) {
+    updateData.source_path = params.source_path;
+  }
+  if (params.source_filename !== undefined) {
+    updateData.source_filename = params.source_filename;
   }
 
   const { error } = await supabase

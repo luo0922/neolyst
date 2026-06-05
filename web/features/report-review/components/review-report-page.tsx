@@ -60,6 +60,7 @@ export function ReviewReportPage({
   const [reportFile, setReportFile] = React.useState<File | null>(null);
   const [pdfFile, setPdfFile] = React.useState<File | null>(null);
   const [modelFile, setModelFile] = React.useState<File | null>(null);
+  const [sourceFile, setSourceFile] = React.useState<File | null>(null);
   const [rejectReason, setRejectReason] = React.useState("");
   const [actionLoading, setActionLoading] = React.useState(false);
 
@@ -130,6 +131,15 @@ export function ReviewReportPage({
     );
   }
 
+  // Helper to get source info with fallback to current report
+  function getSourcePath(item: ReportDetail["status_logs"][number]): string | null {
+    return item.metadata.source_path ?? detail?.source_path ?? null;
+  }
+
+  function getSourceFilename(item: ReportDetail["status_logs"][number]): string | null {
+    return item.metadata.source_filename ?? detail?.source_filename ?? null;
+  }
+
   function updateAnalyst(index: number, analystEmail: string) {
     setFormAnalysts((prev) => {
       const next = [...prev];
@@ -173,17 +183,21 @@ export function ReviewReportPage({
     word_path: string | null;
     pdf_path: string | null;
     model_path: string | null;
+    source_path: string | null;
+    source_filename: string | null;
   }> {
     let wordPath: string | null = detail?.word_path ?? null;
     let pdfPath: string | null = detail?.pdf_path ?? null;
     const modelPath: string | null = detail?.model_path ?? null;
+    let sourcePath: string | null = detail?.source_path ?? null;
+    let sourceFilename: string | null = detail?.source_filename ?? null;
 
     // Upload Word/PPT file
     if (reportFile) {
       const check = validateWordPptExtension(reportFile.name);
       if (!check.ok) {
         toast.error(check.error, { title: "Validation Error" });
-        return { word_path: null, pdf_path: null, model_path: null };
+        return { word_path: null, pdf_path: null, model_path: null, source_path: null, source_filename: null };
       }
 
       const fd = new FormData();
@@ -194,7 +208,7 @@ export function ReviewReportPage({
       const result = await uploadReportFileAction(fd);
       if (!result.ok) {
         toast.error(result.error, { title: "Upload Error" });
-        return { word_path: null, pdf_path: null, model_path: null };
+        return { word_path: null, pdf_path: null, model_path: null, source_path: null, source_filename: null };
       }
       wordPath = result.file_path;
     }
@@ -204,7 +218,7 @@ export function ReviewReportPage({
       const check = validatePdfExtension(pdfFile.name);
       if (!check.ok) {
         toast.error(check.error, { title: "Validation Error" });
-        return { word_path: null, pdf_path: null, model_path: null };
+        return { word_path: null, pdf_path: null, model_path: null, source_path: null, source_filename: null };
       }
 
       const fd = new FormData();
@@ -215,15 +229,39 @@ export function ReviewReportPage({
       const result = await uploadReportFileAction(fd);
       if (!result.ok) {
         toast.error(result.error, { title: "Upload Error" });
-        return { word_path: null, pdf_path: null, model_path: null };
+        return { word_path: null, pdf_path: null, model_path: null, source_path: null, source_filename: null };
       }
       pdfPath = result.file_path;
+    }
+
+    // Upload Source file (original report)
+    if (sourceFile) {
+      const check = validateWordPptExtension(sourceFile.name);
+      if (!check.ok) {
+        toast.error(check.error, { title: "Validation Error" });
+        return { word_path: null, pdf_path: null, model_path: null, source_path: null, source_filename: null };
+      }
+
+      const fd = new FormData();
+      fd.append("file", sourceFile);
+      fd.append("reportId", detail!.id);
+      fd.append("label", "source");
+
+      const result = await uploadReportFileAction(fd);
+      if (!result.ok) {
+        toast.error(result.error, { title: "Upload Error" });
+        return { word_path: null, pdf_path: null, model_path: null, source_path: null, source_filename: null };
+      }
+      sourcePath = result.file_path;
+      sourceFilename = sourceFile.name; // 保留原始文件名（含中文）
     }
 
     return {
       word_path: wordPath,
       pdf_path: pdfPath,
       model_path: modelPath,
+      source_path: sourcePath,
+      source_filename: sourceFilename,
     };
   }
 
@@ -251,6 +289,7 @@ export function ReviewReportPage({
     const hasChanges =
       reportFile ||
       pdfFile ||
+      sourceFile ||
       formTitle !== detail.title ||
       formInvestmentThesis !== (detail.investment_thesis ?? "");
 
@@ -282,6 +321,8 @@ export function ReviewReportPage({
         word_path: uploadResult.word_path,
         pdf_path: uploadResult.pdf_path,
         model_path: uploadResult.model_path,
+        source_path: uploadResult.source_path,
+        source_filename: uploadResult.source_filename,
       });
 
       if (!saveResult.ok) {
@@ -293,6 +334,7 @@ export function ReviewReportPage({
       setDetail(saveResult.data);
       setReportFile(null);
       setPdfFile(null);
+      setSourceFile(null);
     }
 
     const payload =
@@ -557,6 +599,56 @@ export function ReviewReportPage({
             Report Files
           </h2>
           <div className="space-y-4">
+            {/* Source File (Original Report) - show saved or newly selected - placed at the top */}
+            {(detail.source_path || sourceFile) ? (
+              <div className="rounded-[8px] border border-[var(--border-subtle)] bg-[var(--bg-surface-hover)]/40 p-3">
+                {sourceFile ? (
+                  <div className="flex items-center gap-2 text-sm text-green-600">
+                    <svg
+                      className="h-4 w-4"
+                      fill="none"
+                      stroke="currentColor"
+                      viewBox="0 0 24 24"
+                    >
+                      <path
+                        strokeLinecap="round"
+                        strokeLinejoin="round"
+                        strokeWidth={2}
+                        d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"
+                      />
+                    </svg>
+                    Selected: {sourceFile.name}
+                  </div>
+                ) : detail.source_path ? (
+                  <button
+                    type="button"
+                    className="flex items-center gap-2 text-sm text-blue-500 hover:underline"
+                    onClick={() =>
+                      handleDownload(
+                        detail.source_path!,
+                        detail.source_filename ?? detail.source_path!.split("/").pop() ?? "source",
+                      )
+                    }
+                  >
+                    <svg
+                      className="h-4 w-4"
+                      fill="none"
+                      stroke="currentColor"
+                      viewBox="0 0 24 24"
+                    >
+                      <path
+                        strokeLinecap="round"
+                        strokeLinejoin="round"
+                        strokeWidth={2}
+                        d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"
+                      />
+                    </svg>
+                    {detail.source_filename ?? detail.source_path.split("/").pop()}
+                  </button>
+                ) : null}
+              </div>
+            ) : null}
+
             {/* Report File - show saved or newly selected */}
             {(detail.word_path || reportFile) ? (
               <div className="rounded-[8px] border border-[var(--border-subtle)] bg-[var(--bg-surface-hover)]/40 p-3">
@@ -711,6 +803,14 @@ export function ReviewReportPage({
               onFileChange={setModelFile}
               hint="Supports .xls/.xlsx/.csv"
             />
+
+            <FileDropzone
+              label="Source File (Original Report)"
+              accept=".doc,.docx,.ppt,.pptx"
+              file={sourceFile}
+              onFileChange={setSourceFile}
+              hint="Original report file (Word/PPT). Filename with Chinese characters will be preserved for download."
+            />
           </div>
         </section>
 
@@ -743,8 +843,25 @@ export function ReviewReportPage({
                       Note: {item.reason}
                     </div>
                   ) : null}
-                  {(item.metadata.word_path || item.metadata.pdf_path || item.metadata.model_path) ? (
+                  {(item.metadata.word_path || item.metadata.pdf_path || item.metadata.model_path || getSourcePath(item)) ? (
                     <div className="mt-2 space-y-1">
+                      {/* Source file (current report fallback) */}
+                      {getSourcePath(item) ? (
+                        <button
+                          type="button"
+                          className="flex items-center gap-1 text-xs text-blue-500 hover:underline"
+                          onClick={() => {
+                            const path = getSourcePath(item)!;
+                            const filename = getSourceFilename(item) ?? path.split("/").pop() ?? "source";
+                            handleDownload(path, filename);
+                          }}
+                        >
+                          <svg className="h-3 w-3 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+                          </svg>
+                          {getSourceFilename(item) ?? getSourcePath(item)!.split("/").pop()}
+                        </button>
+                      ) : null}
                       {item.metadata.word_path ? (
                         <button
                           type="button"
