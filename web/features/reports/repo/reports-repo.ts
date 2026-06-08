@@ -745,19 +745,20 @@ export async function saveReportContent(
     }
   }
 
-  // Step 3: update model path
+  // Step 3: update model path / model_filename (一次性更新 model_path + model_filename)
+  // 函数签名：update_model_path(p_report_id uuid, p_model_path text, p_model_filename text)
+  // 只要传了 model_path 就会触发该函数（model_filename 可为空，函数内部处理 null）。
   if (params.model_path) {
     const { error: modelError } = await supabase.rpc("update_model_path", {
       p_report_id: params.report_id,
       p_model_path: params.model_path,
+      p_model_filename: params.model_filename ?? null,
     });
     if (modelError) {
       return err(modelError.message);
     }
-  }
-
-  // Step 3b: update model_filename (原始文件名，含中文等)
-  if (params.model_filename !== undefined && params.model_filename !== null) {
+  } else if (params.model_filename !== undefined && params.model_filename !== null) {
+    // 没传 model_path 但传了 model_filename：直接更新 filename 即可
     const { error: modelFilenameError } = await supabase
       .from("report")
       .update({ model_filename: params.model_filename })
