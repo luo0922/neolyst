@@ -262,6 +262,7 @@ export function NewReportPageClient({
           word_path: string | null;
           pdf_path: string | null;
           model_path: string | null;
+          model_filename: string | null;
           chief_approval_path: string | null;
         };
       }
@@ -275,6 +276,8 @@ export function NewReportPageClient({
     let wordPath: string | null = activeReport?.word_path ?? null;
     let pdfPath: string | null = activeReport?.pdf_path ?? null;
     let modelPath: string | null = activeReport?.model_path ?? null;
+    // model_filename: 原始文件名（含中文等），用于在 UI 上展示
+    let modelFilename: string | null = activeReport?.model_filename ?? null;
     let chiefApprovalPath: string | null = activeReport?.chief_approval_path ?? null;
 
     // Upload Word/PPT file
@@ -332,6 +335,8 @@ export function NewReportPageClient({
         return { ok: false, error: result.error };
       }
       modelPath = result.file_path;
+      // 保留原始文件名（含中文等），用于在 UI 上展示
+      modelFilename = result.file_name;
     }
 
     // Upload Chief Approval file
@@ -359,6 +364,7 @@ export function NewReportPageClient({
         word_path: wordPath,
         pdf_path: pdfPath,
         model_path: modelPath,
+        model_filename: modelFilename,
         chief_approval_path: chiefApprovalPath,
       },
     };
@@ -404,6 +410,7 @@ export function NewReportPageClient({
         word_path: uploadResult.data.word_path,
         pdf_path: uploadResult.data.pdf_path,
         model_path: uploadResult.data.model_path,
+        model_filename: uploadResult.data.model_filename,
         chief_approval_path: uploadResult.data.chief_approval_path,
       });
 
@@ -464,6 +471,7 @@ export function NewReportPageClient({
         word_path: uploadResult.data.word_path,
         pdf_path: uploadResult.data.pdf_path,
         model_path: uploadResult.data.model_path,
+        model_filename: uploadResult.data.model_filename,
         chief_approval_path: uploadResult.data.chief_approval_path,
       });
 

@@ -29,6 +29,8 @@ export type ReportStatusLogMetadata = {
   chief_approval_path: string | null;
   source_path: string | null;
   source_filename: string | null;
+  // 原始文件名（用于在 status log 中按上传节点显示）
+  model_filename: string | null;
   [key: string]: unknown;
 };
 
@@ -68,6 +70,8 @@ export type ReportSummary = {
   pdf_path: string | null;
   model_path: string | null;
   chief_approval_path: string | null;
+  // *_filename: 原始文件名（含中文等），用于显示与下载
+  model_filename: string | null;
   // source_path/source_filename: 原始稿信息
   source_path: string | null;
   source_filename: string | null;
@@ -152,6 +156,7 @@ export type SaveReportContentParams = {
   word_path?: string | null;
   pdf_path?: string | null;
   model_path?: string | null;
+  model_filename?: string | null;
   chief_approval_path?: string | null;
   source_path?: string | null;
   source_filename?: string | null;
@@ -211,6 +216,7 @@ function normalizeReportSummaryRow(
     pdf_path: row.pdf_path as string | null,
     model_path: row.model_path as string | null,
     chief_approval_path: row.chief_approval_path as string | null,
+    model_filename: (row.model_filename as string | null) ?? null,
     source_path: row.source_path as string | null,
     source_filename: row.source_filename as string | null,
     published_by: row.published_by as string | null,
@@ -747,6 +753,17 @@ export async function saveReportContent(
     });
     if (modelError) {
       return err(modelError.message);
+    }
+  }
+
+  // Step 3b: update model_filename (原始文件名，含中文等)
+  if (params.model_filename !== undefined && params.model_filename !== null) {
+    const { error: modelFilenameError } = await supabase
+      .from("report")
+      .update({ model_filename: params.model_filename })
+      .eq("id", params.report_id);
+    if (modelFilenameError) {
+      return err(modelFilenameError.message);
     }
   }
 

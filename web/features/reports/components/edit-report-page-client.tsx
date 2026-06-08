@@ -30,7 +30,6 @@ import {
   getReportDownloadUrlAction,
   retractReportAction,
   saveReportContentAction,
-  submitReportAction,
   uploadReportFileAction,
 } from "@/features/reports/actions";
 import {
@@ -292,6 +291,7 @@ export function EditReportPageClient({
           word_path: string | null;
           pdf_path: string | null;
           model_path: string | null;
+          model_filename: string | null;
           chief_approval_path: string | null;
           source_path: string | null;
           source_filename: string | null;
@@ -304,6 +304,9 @@ export function EditReportPageClient({
     let wordPath: string | null = activeReport?.word_path ?? null;
     let pdfPath: string | null = activeReport?.pdf_path ?? null;
     let modelPath: string | null = activeReport?.model_path ?? null;
+    // model_filename: 原始文件名（含中文等），用于显示；保留 report 中已有的值，
+    // 仅当用户重新上传时更新。
+    let modelFilename: string | null = activeReport?.model_filename ?? null;
     let chiefApprovalPath: string | null = activeReport?.chief_approval_path ?? null;
     let sourcePath: string | null = activeReport?.source_path ?? null;
     let sourceFilename: string | null = activeReport?.source_filename ?? null;
@@ -363,6 +366,8 @@ export function EditReportPageClient({
         return { ok: false, error: result.error };
       }
       modelPath = result.file_path;
+      // 保留原始文件名（含中文等），用于在 UI 上展示。Storage 中存的是 ASCII-safe 名称。
+      modelFilename = result.file_name;
     }
 
     // Upload Chief Approval file
@@ -410,6 +415,7 @@ export function EditReportPageClient({
         word_path: wordPath,
         pdf_path: pdfPath,
         model_path: modelPath,
+        model_filename: modelFilename,
         chief_approval_path: chiefApprovalPath,
         source_path: sourcePath,
         source_filename: sourceFilename,
@@ -452,6 +458,7 @@ export function EditReportPageClient({
         word_path: uploadResult.data.word_path,
         pdf_path: uploadResult.data.pdf_path,
         model_path: uploadResult.data.model_path,
+        model_filename: uploadResult.data.model_filename,
         chief_approval_path: uploadResult.data.chief_approval_path,
         source_path: uploadResult.data.source_path,
         source_filename: uploadResult.data.source_filename,
@@ -490,30 +497,6 @@ export function EditReportPageClient({
   }
 
   async function handleSubmit() {
-    if (!activeReport) {
-      toast.error("Please save draft first.", { title: "Error" });
-      return;
-    }
-
-    setSaving(true);
-    try {
-      const submitResult = await submitReportAction({
-        report_id: activeReport.id,
-      });
-      if (!submitResult.ok) {
-        toast.error(submitResult.error, { title: "Error" });
-        return;
-      }
-
-      setActiveReport(submitResult.data);
-      toast.success("Report submitted.", { title: "Success" });
-      router.refresh();
-    } finally {
-      setSaving(false);
-    }
-  }
-
-  async function handleDirectSubmit() {
     if (!canEdit) {
       toast.error("No permission", { title: "Error" });
       return;
@@ -548,6 +531,7 @@ export function EditReportPageClient({
         word_path: uploadResult.data.word_path,
         pdf_path: uploadResult.data.pdf_path,
         model_path: uploadResult.data.model_path,
+        model_filename: uploadResult.data.model_filename,
         chief_approval_path: uploadResult.data.chief_approval_path,
         source_path: uploadResult.data.source_path,
         source_filename: uploadResult.data.source_filename,
@@ -973,7 +957,8 @@ export function EditReportPageClient({
                     onClick={() =>
                       handleDownload(
                         activeReport.model_path!,
-                        activeReport.model_path!.split("/").pop() ?? "model",
+                        // 优先使用原始文件名（含中文等），否则回退到 path 最后一段
+                        activeReport.model_filename ?? activeReport.model_path!.split("/").pop() ?? "model",
                       )
                     }
                   >
@@ -990,7 +975,7 @@ export function EditReportPageClient({
                         d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"
                       />
                     </svg>
-                    {activeReport.model_path.split("/").pop()}
+                    {activeReport.model_filename ?? activeReport.model_path.split("/").pop()}
                   </button>
                 </div>
               ) : null}
@@ -1154,12 +1139,21 @@ export function EditReportPageClient({
                         <button
                           type="button"
                           className="flex items-center gap-1 text-xs text-blue-500 hover:underline"
-                          onClick={() => handleDownload(item.metadata.model_path!, item.metadata.model_path!.split("/").pop() ?? "model.xlsx")}
+                          onClick={() => {
+                            const path = item.metadata.model_path!;
+                            // 优先使用 log metadata 中的原始文件名（含中文等），否则回退
+                            const filename =
+                              (item.metadata.model_filename as string | null | undefined) ??
+                              path.split("/").pop() ??
+                              "model.xlsx";
+                            handleDownload(path, filename);
+                          }}
                         >
                           <svg className="h-3 w-3 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
                           </svg>
-                          {item.metadata.model_path.split("/").pop()}
+                          {(item.metadata.model_filename as string | null | undefined) ??
+                            item.metadata.model_path.split("/").pop()}
                         </button>
                       ) : null}
                       {getChiefApprovalPath(item) ? (
@@ -1200,15 +1194,6 @@ export function EditReportPageClient({
               {canSubmit ? (
                 <Button type="button" onClick={handleSubmit} isLoading={saving}>
                   Submit
-                </Button>
-              ) : null}
-              {canSubmit ? (
-                <Button
-                  type="button"
-                  onClick={handleDirectSubmit}
-                  isLoading={saving}
-                >
-                  Direct Submit
                 </Button>
               ) : null}
             </>

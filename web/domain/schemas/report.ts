@@ -82,6 +82,8 @@ const reportEditableFieldsSchema = z.object({
   pdf_path: z.string().trim().nullable().optional(),
   model_path: z.string().trim().nullable().optional(),
   chief_approval_path: z.string().trim().nullable().optional(),
+  // *_filename: 原始文件名（含中文等），用于显示与下载。Storage 中存的是 ASCII-safe 名称。
+  model_filename: z.string().trim().nullable().optional(),
   // source_path/source_filename: 原始稿信息
   source_path: z.string().trim().nullable().optional(),
   source_filename: z.string().trim().nullable().optional(),
@@ -92,6 +94,7 @@ export const reportCreateSchema = reportEditableFieldsSchema.omit({
   pdf_path: true,
   model_path: true,
   chief_approval_path: true,
+  model_filename: true,
 });
 
 export const reportSaveSchema = reportEditableFieldsSchema.extend({

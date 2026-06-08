@@ -795,7 +795,8 @@ export function ReviewReportPage({
                   onClick={() =>
                     handleDownload(
                       detail.model_path!,
-                      detail.model_path!.split("/").pop() ?? "model",
+                      // 优先使用原始文件名（含中文等），否则回退到 path 最后一段
+                      detail.model_filename ?? detail.model_path!.split("/").pop() ?? "model",
                     )
                   }
                 >
@@ -812,7 +813,7 @@ export function ReviewReportPage({
                       d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"
                     />
                   </svg>
-                  {detail.model_path.split("/").pop()}
+                  {detail.model_filename ?? detail.model_path.split("/").pop()}
                 </button>
               </div>
             ) : null}
@@ -985,12 +986,21 @@ export function ReviewReportPage({
                         <button
                           type="button"
                           className="flex items-center gap-1 text-xs text-blue-500 hover:underline"
-                          onClick={() => handleDownload(item.metadata.model_path!, item.metadata.model_path!.split("/").pop() ?? "model.xlsx")}
+                          onClick={() => {
+                            const path = item.metadata.model_path!;
+                            // 优先使用 log metadata 中的原始文件名（含中文等），否则回退
+                            const filename =
+                              (item.metadata.model_filename as string | null | undefined) ??
+                              path.split("/").pop() ??
+                              "model.xlsx";
+                            handleDownload(path, filename);
+                          }}
                         >
                           <svg className="h-3 w-3 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
                           </svg>
-                          {item.metadata.model_path.split("/").pop()}
+                          {(item.metadata.model_filename as string | null | undefined) ??
+                            item.metadata.model_path.split("/").pop()}
                         </button>
                       ) : null}
                       {getChiefApprovalPath(item) ? (

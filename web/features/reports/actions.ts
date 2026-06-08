@@ -339,6 +339,7 @@ function toSavePayload(input: {
   word_path?: string | null;
   pdf_path?: string | null;
   model_path?: string | null;
+  model_filename?: string | null;
   chief_approval_path?: string | null;
   source_path?: string | null;
   source_filename?: string | null;
@@ -386,6 +387,10 @@ function toSavePayload(input: {
       input.model_path === undefined
         ? (input.fallback?.model_path ?? null)
         : (input.model_path ?? null),
+    model_filename:
+      input.model_filename === undefined
+        ? (input.fallback?.model_filename ?? null)
+        : (input.model_filename ?? null),
     chief_approval_path:
       input.chief_approval_path === undefined
         ? (input.fallback?.chief_approval_path ?? null)
@@ -617,6 +622,7 @@ export async function saveReportContentAction(
     word_path: payload.word_path,
     pdf_path: payload.pdf_path,
     model_path: payload.model_path,
+    model_filename: payload.model_filename,
     chief_approval_path: payload.chief_approval_path,
     source_path: payload.source_path,
     source_filename: payload.source_filename,
@@ -776,6 +782,7 @@ export async function directSubmitReportAction(
       word_path: payload.word_path,
       pdf_path: payload.pdf_path,
       model_path: payload.model_path,
+      model_filename: payload.model_filename,
       chief_approval_path: payload.chief_approval_path,
       source_path: payload.source_path,
       source_filename: payload.source_filename,
@@ -844,12 +851,22 @@ export async function getReportDownloadUrlAction(
 }
 
 export type StorageUploadResult =
-  | { ok: true; file_path: string }
+  | {
+      ok: true;
+      file_path: string;
+      // 原始文件名（含中文等非 ASCII 字符），用于在 *_filename 字段持久化与展示。
+      // Storage 中实际存储使用 ASCII-safe 名称（safeName），原文件名字符在下载时使用。
+      file_name: string;
+    }
   | { ok: false; error: string };
 
 /**
  * Upload report file to storage.
  * New schema: no version numbers. Path format: reports/{reportId}/{category}/{timestamp}_{filename}
+ *
+ * Storage key 使用 ASCII-safe 名称（剥离中文等非 ASCII 字符），Supabase Storage (S3)
+ * 拒绝包含非 ASCII 字符的 key。原始文件名（含中文）通过返回值的 `file_name` 字段
+ * 传给调用方，由调用方写入对应的 `*_filename` 字段。
  */
 export async function uploadReportFileAction(
   formData: FormData,
@@ -871,9 +888,13 @@ export async function uploadReportFileAction(
     return { ok: false, error: "Missing required fields." };
   }
 
-  // Keep only safe characters: alphanumeric, underscore, hyphen, dot, and Unicode
-  // Supabase Storage (S3) disallows: < > : " / \ | ? * ( ) control chars, # % ~
-  const safeName = file.name.replace(/[<>:"/\\|?*()#%~\x00-\x1f]/g, "_");
+  // 保留原始文件名（含中文等），调用方负责存到 *_filename 列。
+  const originalName = file.name;
+
+  // Storage key 必须是 ASCII。剥离所有非 ASCII 字符以及 S3 不允许的特殊字符，
+  // 避免 S3 返回 "Invalid key" 错误。
+  // 保留：a-zA-Z 0-9 . _ -
+  const safeName = file.name.replace(/[^a-zA-Z0-9._-]/g, "_");
   const timestamp = new Date()
     .toISOString()
     .replace("T", "_")
@@ -912,7 +933,7 @@ export async function uploadReportFileAction(
     return { ok: false, error: error.message };
   }
 
-  return { ok: true, file_path: filePath };
+  return { ok: true, file_path: filePath, file_name: originalName };
 }
 
 export async function retractReportAction(
