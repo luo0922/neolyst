@@ -2,6 +2,7 @@ import { redirect } from "next/navigation";
 
 import { getCurrentUserRole } from "@/lib/supabase/server";
 import { listAnalystsAction } from "@/features/analyst-info/actions";
+import { listSectorsGrouped } from "@/features/sectors/repo/sectors-repo";
 
 import { ReviewReportPage as ReviewReportPageContent } from "@/features/report-review/components/review-report-page";
 
@@ -15,10 +16,21 @@ export default async function ReviewReportPage({
     redirect("/403");
   }
 
-  // Fetch analysts list on server side
-  const analystsResult = await listAnalystsAction({ page: 1, query: null });
+  // Fetch analysts list and sectors list on server side
+  const [analystsResult, sectorsResult] = await Promise.all([
+    listAnalystsAction({ page: 1, query: null }),
+    listSectorsGrouped({ is_active: true }),
+  ]);
   const analysts = analystsResult.ok ? analystsResult.data.items : [];
+  const sectors = sectorsResult.ok ? sectorsResult.data : [];
 
   const { id } = await params;
-  return <ReviewReportPageContent reportId={id} userRole={role} analysts={analysts} />;
+  return (
+    <ReviewReportPageContent
+      reportId={id}
+      userRole={role}
+      analysts={analysts}
+      sectors={sectors}
+    />
+  );
 }

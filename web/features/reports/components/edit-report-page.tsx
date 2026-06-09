@@ -4,7 +4,6 @@ import { notFound } from "next/navigation";
 import { listAllActiveAnalysts } from "@/features/analyst-info/repo/analysts-repo";
 import { listCoverages } from "@/features/coverage/repo/coverage-repo";
 import { listAllRatings } from "@/features/ratings/repo/ratings-repo";
-import { listAllRegions } from "@/features/regions/repo/regions-repo";
 import { listSectorsGroupedAction } from "@/features/sectors/actions";
 import { getReportDetailAction, listReportTypeOptionsAction } from "../actions";
 import { EditReportPageClient } from "./edit-report-page-client";
@@ -22,12 +21,11 @@ export async function EditReportPage({
 }: EditReportPageProps) {
   const { id } = await params;
 
-  const [detailResult, typesResult, analystsResult, regionsResult, sectorsResult, coveragesResult, ratingsResult] =
+  const [detailResult, typesResult, analystsResult, sectorsResult, coveragesResult, ratingsResult] =
     await Promise.all([
       getReportDetailAction(id),
       listReportTypeOptionsAction(),
       listAllActiveAnalysts(),
-      listAllRegions(),
       listSectorsGroupedAction({ is_active: true }),
       listCoverages({ page: 1, query: null }),
       listAllRatings(),
@@ -73,7 +71,6 @@ export async function EditReportPage({
       currentUserId={currentUserId}
       reportTypes={typesResult.data}
       analysts={analystsResult.ok ? analystsResult.data : []}
-      regions={regionsResult.ok ? regionsResult.data : []}
       sectors={sectorsResult.ok ? sectorsResult.data : []}
       coverages={coveragesResult.ok ? coveragesResult.data.items : []}
       ratings={ratingsResult.ok ? ratingsResult.data : []}

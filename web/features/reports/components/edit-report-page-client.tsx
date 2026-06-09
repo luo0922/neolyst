@@ -19,7 +19,6 @@ import type {
 } from "@/domain/schemas/report";
 import type { Analyst } from "@/features/analyst-info/repo/analysts-repo";
 import type { CoverageWithDetails } from "@/features/coverage/repo/coverage-repo";
-import type { Region } from "@/features/regions/repo/regions-repo";
 import type { Rating } from "@/features/ratings/repo/ratings-repo";
 import type { SectorWithChildren } from "@/features/sectors/repo/sectors-repo";
 import {
@@ -71,14 +70,6 @@ function isCompanyType(reportType: string): boolean {
   return reportType === "company" || reportType === "company_flash";
 }
 
-function requiresRegion(reportType: string): boolean {
-  return (
-    reportType === "sector" ||
-    reportType === "sector_flash" ||
-    reportType === "common"
-  );
-}
-
 function requiresSector(reportType: string): boolean {
   return reportType === "sector" || reportType === "sector_flash";
 }
@@ -93,7 +84,6 @@ export interface EditReportPageClientProps {
   currentUserId: string;
   reportTypes: string[];
   analysts: Analyst[];
-  regions: Region[];
   sectors: SectorWithChildren[];
   coverages: CoverageWithDetails[];
   ratings: Rating[];
@@ -105,7 +95,6 @@ export function EditReportPageClient({
   currentUserId,
   reportTypes,
   analysts,
-  regions,
   sectors,
   coverages,
   ratings,
@@ -159,9 +148,6 @@ export function EditReportPageClient({
   );
   const [formTargetPrice, setFormTargetPrice] = React.useState(
     initialReport.target_price ?? "",
-  );
-  const [formRegionCode, setFormRegionId] = React.useState(
-    initialReport.region_code ?? "",
   );
   const [formSectorId, setFormSectorId] = React.useState(
     initialReport.sector_id ?? "",
@@ -449,7 +435,6 @@ export function EditReportPageClient({
         ticker: formTicker || null,
         rating: formRating || null,
         target_price: formTargetPrice || null,
-        region_code: formRegionCode || null,
         sector_id: formSectorId || null,
         report_language: formLanguage,
         contact_person: formContactPerson || null,
@@ -522,7 +507,6 @@ export function EditReportPageClient({
         ticker: formTicker || null,
         rating: formRating || null,
         target_price: formTargetPrice || null,
-        region_code: formRegionCode || null,
         sector_id: formSectorId || null,
         report_language: formLanguage,
         contact_person: formContactPerson || null,
@@ -698,22 +682,6 @@ export function EditReportPageClient({
                 disabled={!canEdit}
               />
             </>
-          ) : null}
-
-          {requiresRegion(formReportType) ? (
-            <Select
-              label="Region"
-              value={formRegionCode}
-              onChange={(event) => setFormRegionId(event.target.value)}
-              options={[
-                { value: "", label: "Select region..." },
-                ...regions.map((item) => ({
-                  value: item.code,
-                  label: `${item.name_en} (${item.code})`,
-                })),
-              ]}
-              disabled={!canEdit}
-            />
           ) : null}
 
           {requiresSector(formReportType) ? (

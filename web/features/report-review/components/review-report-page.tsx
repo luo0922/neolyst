@@ -13,6 +13,7 @@ import { useToast } from "@/components/ui/toast";
 import type { ReportAnalystInput } from "@/domain/schemas/report";
 import type { ReportDetail } from "@/features/reports/repo/reports-repo";
 import type { Analyst } from "@/features/analyst-info/repo/analysts-repo";
+import type { SectorWithChildren } from "@/features/sectors/repo/sectors-repo";
 import {
   getReportDownloadUrlAction,
   uploadReportFileAction,
@@ -49,12 +50,14 @@ export interface ReviewReportPageProps {
   reportId: string;
   userRole: "admin" | "sa";
   analysts: Analyst[];
+  sectors: SectorWithChildren[];
 }
 
 export function ReviewReportPage({
   reportId,
   userRole: _userRole,
   analysts: analystsProp,
+  sectors,
 }: ReviewReportPageProps) {
   const router = useRouter();
   const toast = useToast();
@@ -73,6 +76,7 @@ export function ReviewReportPage({
   const [formTitle, setFormTitle] = React.useState("");
   const [formInvestmentThesis, setFormInvestmentThesis] = React.useState("");
   const [formAnalysts, setFormAnalysts] = React.useState<ReportAnalystInput[]>([]);
+  const [formSectorId, setFormSectorId] = React.useState("");
 
   React.useEffect(() => {
     async function loadData() {
@@ -87,6 +91,7 @@ export function ReviewReportPage({
       setDetail(detailResult.data);
       setFormTitle(detailResult.data.title);
       setFormInvestmentThesis(detailResult.data.investment_thesis ?? "");
+      setFormSectorId(detailResult.data.sector_id ?? "");
       setFormAnalysts(
         detailResult.data.analysts
           .sort((a, b) => a.author_order - b.author_order)
@@ -326,7 +331,8 @@ export function ReviewReportPage({
       sourceFile ||
       chiefApprovalFile ||
       formTitle !== detail.title ||
-      formInvestmentThesis !== (detail.investment_thesis ?? "");
+      formInvestmentThesis !== (detail.investment_thesis ?? "") ||
+      formSectorId !== (detail.sector_id ?? "");
 
     if (hasChanges) {
       const uploadResult = await uploadReportFiles();
@@ -347,7 +353,7 @@ export function ReviewReportPage({
         rating: detail.rating,
         target_price: detail.target_price,
         region_code: detail.region_code,
-        sector_id: detail.sector_id,
+        sector_id: formSectorId || detail.sector_id,
         report_language: detail.report_language,
         contact_person: detail.contact_person,
         investment_thesis: formInvestmentThesis || null,
@@ -500,26 +506,6 @@ export function ReviewReportPage({
                 </span>
               </div>
             )}
-            {detail.region && (
-              <div>
-                <span className="text-sm text-[var(--fg-tertiary)]">
-                  Region:
-                </span>
-                <span className="ml-2 text-sm text-[var(--fg-primary)]">
-                  {detail.region.name_en}
-                </span>
-              </div>
-            )}
-            {detail.sector && (
-              <div>
-                <span className="text-sm text-[var(--fg-tertiary)]">
-                  Sector:
-                </span>
-                <span className="ml-2 text-sm text-[var(--fg-primary)]">
-                  {detail.sector.name_en}
-                </span>
-              </div>
-            )}
             {detail.report_language && (
               <div>
                 <span className="text-sm text-[var(--fg-tertiary)]">
@@ -544,6 +530,29 @@ export function ReviewReportPage({
               <span className="ml-2 text-sm text-[var(--fg-primary)]">
                 {detail.coverage.english_name}
               </span>
+            </div>
+          )}
+
+          {(detail?.report_type === "sector" || detail?.report_type === "sector_flash") && (
+            <div className="mt-4">
+              <Select
+                label="Sector"
+                value={formSectorId}
+                onChange={(event) => setFormSectorId(event.target.value)}
+                options={[
+                  { value: "", label: "Select sector..." },
+                  ...sectors.flatMap((parent) => [
+                    {
+                      value: parent.id,
+                      label: `${parent.name_en}${parent.name_cn ? ` (${parent.name_cn})` : ""}`,
+                    },
+                    ...parent.children.map((child) => ({
+                      value: child.id,
+                      label: `    ${child.name_en}${child.name_cn ? ` (${child.name_cn})` : ""}`,
+                    })),
+                  ]),
+                ]}
+              />
             </div>
           )}
 

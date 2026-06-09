@@ -111,6 +111,7 @@ export async function saveReviewReportContent(params: {
     lead_analyst_email: leadAnalyst,
     analyst_emails: analystEmails,
     contact_person: params.contact_person ?? null,
+    sector_id: params.sector_id ?? null,
   };
   if (params.word_path) {
     updateData.word_path = params.word_path;
