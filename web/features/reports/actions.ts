@@ -95,14 +95,6 @@ function isCompanyType(reportType: string): boolean {
   return reportType === "company" || reportType === "company_flash";
 }
 
-function requiresRegion(reportType: string): boolean {
-  return (
-    reportType === "sector" ||
-    reportType === "sector_flash" ||
-    reportType === "common"
-  );
-}
-
 function requiresSector(reportType: string): boolean {
   return reportType === "sector" || reportType === "sector_flash";
 }
@@ -236,9 +228,6 @@ async function validateReportForSubmit(
   }
   // certificate_confirmed check removed
 
-  if (requiresRegion(detail.report_type) && !detail.region_code) {
-    return "Region is required for this Report Type.";
-  }
   if (requiresSector(detail.report_type) && !detail.sector_id) {
     return "Sector is required for this Report Type.";
   }
@@ -799,7 +788,7 @@ export async function directSubmitReportAction(
 
     const submitResult = await submitReport(reportId);
     if (!submitResult.ok) {
-      return err("已保存为 Draft，提交失败");
+      return err(`已保存为 Draft，提交失败：${submitResult.error}`);
     }
 
     revalidatePath("/reports");
@@ -825,7 +814,7 @@ export async function directSubmitReportAction(
 
   const submitResult = await submitReport(reportId);
   if (!submitResult.ok) {
-    return err("已保存为 Draft，提交失败");
+    return err(`已保存为 Draft，提交失败：${submitResult.error}`);
   }
 
   revalidatePath("/reports");
