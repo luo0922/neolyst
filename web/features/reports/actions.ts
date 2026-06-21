@@ -8,6 +8,7 @@ import {
   reportDownloadSchema,
   reportSaveSchema,
   reportSubmitSchema,
+  isReportTerminal,
   type ReportAnalystInput,
   type ReportLanguage,
   type ReportStatus,
@@ -56,6 +57,10 @@ function canCreateOrEdit(role: Role): boolean {
 }
 
 function isEditableStatus(status: ReportStatus): boolean {
+  // 终态（published/terminated）禁止任何修改，详见 isReportTerminal。
+  if (isReportTerminal(status)) {
+    return false;
+  }
   return status === "draft" || status === "rejected" || status === "submitted";
 }
 
@@ -297,6 +302,10 @@ async function assertEditable(
   }
 
   const detail = detailResult.data;
+  // 终态（published/terminated）显式拒绝，给出明确文案。
+  if (isReportTerminal(detail.status)) {
+    return err("Published or terminated reports cannot be modified.");
+  }
   if (!isEditableStatus(detail.status)) {
     return err("Only draft/submitted reports can be edited.");
   }

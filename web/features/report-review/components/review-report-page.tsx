@@ -11,6 +11,7 @@ import { Select } from "@/components/ui/select";
 import { RichTextEditor } from "@/components/ui/rich-text-editor";
 import { useToast } from "@/components/ui/toast";
 import type { ReportAnalystInput } from "@/domain/schemas/report";
+import { isReportTerminal } from "@/domain/schemas/report";
 import type { ReportDetail } from "@/features/reports/repo/reports-repo";
 import type { Analyst } from "@/features/analyst-info/repo/analysts-repo";
 import type { SectorWithChildren } from "@/features/sectors/repo/sectors-repo";
@@ -48,7 +49,7 @@ function formatDateTime(iso: string): string {
 
 export interface ReviewReportPageProps {
   reportId: string;
-  userRole: "admin" | "sa";
+  userRole: "admin" | "sa" | "analyst";
   analysts: Analyst[];
   sectors: SectorWithChildren[];
 }
@@ -309,6 +310,15 @@ export function ReviewReportPage({
       return;
     }
 
+    // 终态（published/terminated）防御：禁止任何状态流转操作。
+    // UI 上对应按钮已隐藏，此处再做一道兜底以防边角触发。
+    if (isReportTerminal(detail.status)) {
+      toast.error("Published or terminated reports cannot be modified.", {
+        title: "Forbidden",
+      });
+      return;
+    }
+
     // Approve requires PDF
     if (action === "approve") {
       const hasNewPdfFile = pdfFile !== null;
@@ -424,6 +434,14 @@ export function ReviewReportPage({
     );
   }
 
+  // 终态（published/terminated）完全只读：禁用全部输入控件与上传交互。
+  // draft 也强制只读：审批人不应修改处于 draft 的报告（draft 属于分析师工作区，
+  // 且 saveReviewReportAction 仅允许 submitted 状态保存，draft 上启用输入会误导）；
+  // 仅 submitted 状态下允许审批人继续编辑后再 approve/reject。
+  // rejected 保持可编辑（与原行为一致，save 会被服务端拦截为非 submitted）。
+  const isReadOnly =
+    isReportTerminal(detail.status) || detail.status === "draft";
+
   return (
     <div className="min-h-screen bg-[var(--bg-app)]">
       <header className="border-b border-[var(--border-subtle)] bg-[var(--bg-surface)]/60 backdrop-blur">
@@ -457,6 +475,12 @@ export function ReviewReportPage({
       </header>
 
       <main className="mx-auto max-w-5xl space-y-6 px-6 py-8">
+        {isReadOnly ? (
+          <div className="rounded-[8px] border border-amber-500/40 bg-amber-500/10 px-4 py-3 text-sm text-amber-200">
+            This report has been {detail.status === "published" ? "published" : "terminated"} and is read-only. No further modifications are allowed.
+          </div>
+        ) : null}
+
         {/* Basic Info Section */}
         <section className="rounded-[12px] border border-[var(--border-subtle)] bg-[var(--bg-surface)]/70 p-5">
           <h2 className="mb-4 text-sm font-semibold uppercase tracking-wider text-[var(--fg-secondary)]">
@@ -467,6 +491,7 @@ export function ReviewReportPage({
               label="Title"
               value={formTitle}
               onChange={(e) => setFormTitle(e.target.value)}
+              disabled={isReadOnly}
             />
           </div>
           <div className="mt-4 grid grid-cols-1 gap-4 md:grid-cols-2">
@@ -539,6 +564,7 @@ export function ReviewReportPage({
                 label="Sector"
                 value={formSectorId}
                 onChange={(event) => setFormSectorId(event.target.value)}
+                disabled={isReadOnly}
                 options={[
                   { value: "", label: "Select sector..." },
                   ...sectors.flatMap((parent) => [
@@ -562,6 +588,7 @@ export function ReviewReportPage({
               value={formInvestmentThesis}
               onChange={setFormInvestmentThesis}
               minHeight="150px"
+              readOnly={isReadOnly}
             />
           </div>
 
@@ -607,6 +634,7 @@ export function ReviewReportPage({
                       onChange={(e) =>
                         updateAnalyst(index, e.target.value)
                       }
+                      disabled={isReadOnly}
                       options={getAnalystOptions(index)}
                     />
                   </div>
@@ -619,6 +647,7 @@ export function ReviewReportPage({
                       variant="ghost"
                       className="w-full"
                       onClick={() => removeAnalyst(index)}
+                      disabled={isReadOnly}
                     >
                       Remove
                     </Button>
@@ -632,6 +661,7 @@ export function ReviewReportPage({
                 variant="secondary"
                 onClick={addAnalyst}
                 className="mt-2"
+                disabled={isReadOnly}
               >
                 Add Analyst
               </Button>
@@ -883,6 +913,7 @@ export function ReviewReportPage({
               file={reportFile}
               onFileChange={setReportFile}
               hint="Supports .doc/.docx/.ppt/.pptx"
+              disabled={isReadOnly}
             />
 
             <FileDropzone
@@ -891,6 +922,7 @@ export function ReviewReportPage({
               file={pdfFile}
               onFileChange={setPdfFile}
               hint="Supports .pdf"
+              disabled={isReadOnly}
             />
 
             <FileDropzone
@@ -899,6 +931,7 @@ export function ReviewReportPage({
               file={modelFile}
               onFileChange={setModelFile}
               hint="Supports .xls/.xlsx/.csv"
+              disabled={isReadOnly}
             />
 
             <FileDropzone
@@ -907,6 +940,7 @@ export function ReviewReportPage({
               file={sourceFile}
               onFileChange={setSourceFile}
               hint="Original report file (Word/PPT). Filename with Chinese characters will be preserved for download."
+              disabled={isReadOnly}
             />
 
             <FileDropzone
@@ -915,6 +949,7 @@ export function ReviewReportPage({
               file={chiefApprovalFile}
               onFileChange={setChiefApprovalFile}
               hint="Optional image file for chief approval"
+              disabled={isReadOnly}
             />
           </div>
         </section>

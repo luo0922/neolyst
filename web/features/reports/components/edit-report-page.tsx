@@ -1,6 +1,7 @@
 import * as React from "react";
 import { notFound } from "next/navigation";
 
+import { isReportTerminal } from "@/domain/schemas/report";
 import { listAllActiveAnalysts } from "@/features/analyst-info/repo/analysts-repo";
 import { listCoverages } from "@/features/coverage/repo/coverage-repo";
 import { listAllRatings } from "@/features/ratings/repo/ratings-repo";
@@ -42,6 +43,12 @@ export async function EditReportPage({
   }
 
   const report = detailResult.data;
+
+  // 终态（published/terminated）任何角色都不能编辑：理论上应已被路由守卫拦截，
+  // 此处作为防御性兜底，触发 notFound 让用户回到列表。
+  if (isReportTerminal(report.status)) {
+    notFound();
+  }
 
   // Check permission: admin can edit draft/submitted, analyst can only edit own draft/submitted
   const canEdit =

@@ -10,7 +10,7 @@ import { Input } from "@/components/ui/input";
 import { Pagination } from "@/components/ui/pagination";
 import { Select } from "@/components/ui/select";
 import { Table, TD, TH, THead, TR } from "@/components/ui/table";
-import type { ReportStatus } from "@/domain/schemas/report";
+import { isReportTerminal } from "@/domain/schemas/report";
 import type { ReportSummary } from "@/features/reports/repo/reports-repo";
 import type { Analyst } from "@/features/analyst-info/repo/analysts-repo";
 import { terminateReportAction } from "@/features/reports/actions";
@@ -76,6 +76,7 @@ export interface ReportsPageClientProps {
   currentSubmittedBy: string | null;
   currentAnalyst: string | null;
   analysts: Analyst[];
+  reportTypes: string[];
   userRole: "admin" | "sa" | "analyst";
   currentUserId: string;
 }
@@ -91,6 +92,7 @@ export function ReportsPageClient({
   currentSubmittedBy,
   currentAnalyst,
   analysts,
+  reportTypes,
   userRole,
   currentUserId,
 }: ReportsPageClientProps) {
@@ -106,14 +108,13 @@ export function ReportsPageClient({
   const [submittedByFilter, setSubmittedByFilter] = React.useState(currentSubmittedBy ?? "");
   const [analystFilter, setAnalystFilter] = React.useState(currentAnalyst ?? "");
 
-  // Build analyst options for report_type dropdown
+  // Build report_type dropdown options from the full list of active report types
   const reportTypeOptions = React.useMemo(() => {
-    const types = [...new Set(reports.map((r) => r.report_type))];
     return [
       { value: "", label: "All types" },
-      ...types.map((t) => ({ value: t, label: t })),
+      ...reportTypes.map((t) => ({ value: t, label: t })),
     ];
-  }, [reports]);
+  }, [reportTypes]);
 
   React.useEffect(() => {
     setQueryDraft(currentQuery ?? "");
@@ -329,11 +330,37 @@ export function ReportsPageClient({
                   </TD>
                   <TD>
                     <div className="flex justify-end gap-2">
-                      <Link href={`/reports/${report.id}/edit`}>
-                        <Button variant="outline" className="h-7 px-2 text-xs">
-                          {canEditReport(report) ? "Edit" : "View"}
-                        </Button>
-                      </Link>
+                      {(() => {
+                        const terminal = isReportTerminal(report.status);
+                        if (canEditReport(report)) {
+                          return (
+                            <Link href={`/reports/${report.id}/edit`}>
+                              <Button variant="outline" className="h-7 px-2 text-xs">
+                                Edit
+                              </Button>
+                            </Link>
+                          );
+                        }
+                        // 不可编辑的报告路由规则：
+                        //   - SA 始终走 /report-review/[id]（SA 是 review 角色）
+                        //   - 终态（published/terminated）走 /report-review/[id] 只读视图
+                        //   - 其他（analyst 查看 rejected 等）走 /reports/[id]/edit
+                        let viewHref: string;
+                        if (userRole === "sa") {
+                          viewHref = `/report-review/${report.id}`;
+                        } else if (terminal) {
+                          viewHref = `/report-review/${report.id}`;
+                        } else {
+                          viewHref = `/reports/${report.id}/edit`;
+                        }
+                        return (
+                          <Link href={viewHref}>
+                            <Button variant="outline" className="h-7 px-2 text-xs">
+                              View
+                            </Button>
+                          </Link>
+                        );
+                      })()}
                       {report.status !== "published" && report.status !== "terminated" && (
                         <Button
                           variant="outline"

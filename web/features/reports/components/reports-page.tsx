@@ -1,6 +1,7 @@
 import * as React from "react";
 
 import { listAllActiveAnalysts } from "@/features/analyst-info/repo/analysts-repo";
+import { listReportTypeOptions } from "@/features/reports/repo/reports-repo";
 import type { Analyst } from "@/features/analyst-info/repo/analysts-repo";
 import type { ReportStatus } from "@/domain/schemas/report";
 
@@ -45,9 +46,10 @@ export async function ReportsPage({
   const contact_person = params.contact_person?.trim() || null;
   const analyst = params.analyst?.trim() || null;
 
-  const [listResult, analystsResult] = await Promise.all([
+  const [listResult, analystsResult, reportTypesResult] = await Promise.all([
     listReportsAction({ page, query, status, report_type, contact_person, analyst }),
     listAllActiveAnalysts(),
+    listReportTypeOptions(),
   ]);
 
   if (!listResult.ok) {
@@ -59,6 +61,7 @@ export async function ReportsPage({
   }
 
   const analysts = analystsResult.ok ? analystsResult.data : [];
+  const reportTypes = reportTypesResult.ok ? reportTypesResult.data : [];
 
   return (
     <ReportsPageClient
@@ -72,6 +75,7 @@ export async function ReportsPage({
       currentSubmittedBy={contact_person}
       currentAnalyst={analyst}
       analysts={analysts}
+      reportTypes={reportTypes}
       userRole={userRole}
       currentUserId={currentUserId}
     />

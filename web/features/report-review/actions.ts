@@ -6,6 +6,7 @@ import {
   reportReviewActionSchema,
   reportSaveSchema,
   reportSubmitSchema,
+  isReportTerminal,
   type ReportStatus,
 } from "@/domain/schemas/report";
 import { err, type Result } from "@/lib/result";
@@ -112,9 +113,11 @@ export async function getReviewReportDetailAction(
     return actor;
   }
 
-  const roleCheck = ensureReviewerRole(actor.data.role);
-  if (!roleCheck.ok) {
-    return roleCheck;
+  // 仅 admin/sa 可继续；analyst 仅用于查看 published/terminated 终态报告，
+  // 组件层 isReadOnly 已禁用所有输入控件，且 executeReviewAction/saveReviewReportAction
+  // 仍由 ensureReviewerRole 拦截，analyst 无法触发任何写操作。
+  if (actor.data.role !== "admin" && actor.data.role !== "sa" && actor.data.role !== "analyst") {
+    return err("No permission");
   }
 
   return getReviewReportDetail(reportId);
@@ -210,6 +213,19 @@ export async function saveReviewReportAction(input: unknown): Promise<Result<Awa
   const parsed = reportSaveSchema.safeParse(input);
   if (!parsed.success) {
     return err(parsed.error.issues[0]?.message ?? "Invalid input.");
+  }
+
+  // 终态拦截：published/terminated 报告不允许任何修改（审批人也不行）。
+  const detailResult = await getReviewReportDetail(parsed.data.report_id);
+  if (!detailResult.ok) {
+    return detailResult;
+  }
+  if (isReportTerminal(detailResult.data.status)) {
+    return err("Published or terminated reports cannot be modified.");
+  }
+  // 审批人编辑仅允许处于 submitted 状态的报告（与 repo 内 .eq("status","submitted") 对齐）。
+  if (detailResult.data.status !== "submitted") {
+    return err("Only submitted reports can be edited from the review page.");
   }
 
   const result = await saveReviewReportContent({

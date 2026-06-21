@@ -12,7 +12,10 @@ export default async function ReviewReportPage({
   params: Promise<{ id: string }>;
 }) {
   const role = await getCurrentUserRole();
-  if (role !== "admin" && role !== "sa") {
+  // analyst 也允许进入：仅用于查看 published/terminated 终态报告（只读视图）。
+  // 组件层 isReadOnly 禁用所有输入；写操作（approve/reject/reopen/save）由
+  // ensureReviewerRole 在 actions 层继续拦截 admin/sa。
+  if (role !== "admin" && role !== "sa" && role !== "analyst") {
     redirect("/403");
   }
 

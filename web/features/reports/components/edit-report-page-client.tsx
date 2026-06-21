@@ -17,6 +17,7 @@ import type {
   ReportLanguage,
   ReportType,
 } from "@/domain/schemas/report";
+import { isReportTerminal } from "@/domain/schemas/report";
 import type { Analyst } from "@/features/analyst-info/repo/analysts-repo";
 import type { CoverageWithDetails } from "@/features/coverage/repo/coverage-repo";
 import type { Rating } from "@/features/ratings/repo/ratings-repo";
@@ -123,15 +124,21 @@ export function EditReportPageClient({
     [ratings],
   );
 
+  // 终态（published/terminated）任何角色都不能编辑：作为最后一道前端兜底，
+  // 服务端/路由守卫已禁止此状态进入编辑页，这里再次防御以避免任何边角场景。
+  const isTerminal = isReportTerminal(activeReport.status);
+
   const canEdit =
-    userRole === "admin" ||
-    (userRole === "analyst" &&
-      activeReport.owner_user_id === currentUserId &&
-      (activeReport.status === "draft" ||
-        activeReport.status === "rejected" ||
-        activeReport.status === "submitted"));
+    !isTerminal &&
+    (userRole === "admin" ||
+      (userRole === "analyst" &&
+        activeReport.owner_user_id === currentUserId &&
+        (activeReport.status === "draft" ||
+          activeReport.status === "rejected" ||
+          activeReport.status === "submitted")));
 
   const canSubmit =
+    !isTerminal &&
     activeReport.status === "draft" &&
     (userRole === "admin" ||
       (userRole === "analyst" && activeReport.owner_user_id === currentUserId));
@@ -603,6 +610,12 @@ export function EditReportPageClient({
       </header>
 
       <main className="mx-auto max-w-5xl space-y-6 px-6 py-8">
+        {isTerminal ? (
+          <div className="rounded-[8px] border border-amber-500/40 bg-amber-500/10 px-4 py-3 text-sm text-amber-200">
+            This report has been {activeReport.status === "published" ? "published" : "terminated"} and is read-only. No further modifications are allowed.
+          </div>
+        ) : null}
+
         {/* Basic Information Section */}
         <section className="space-y-4 rounded-[12px] border border-[var(--border-subtle)] bg-[var(--bg-surface)]/70 p-5">
           <h2 className="text-sm font-semibold uppercase tracking-wider text-[var(--fg-secondary)]">

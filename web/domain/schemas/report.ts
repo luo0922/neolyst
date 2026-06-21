@@ -146,6 +146,14 @@ export type ReportLanguage = (typeof reportLanguages)[number];
 export type ReportFileLabel = (typeof reportFileLabels)[number];
 export type ReportStatusAction = (typeof reportStatusActions)[number];
 
+// 终态：已发布与已终止报告均视为终态，禁止任何修改（含元数据、文件、附件等）。
+// 该判断作为前端/Server Action/Repo 三层防护的单一事实源。
+export const REPORT_TERMINAL_STATUSES = ["published", "terminated"] as const satisfies readonly ReportStatus[];
+
+export function isReportTerminal(status: ReportStatus): boolean {
+  return (REPORT_TERMINAL_STATUSES as readonly ReportStatus[]).includes(status);
+}
+
 export type ReportAnalystInput = z.infer<typeof reportAnalystInputSchema>;
 export type ReportCreateInput = z.infer<typeof reportCreateSchema>;
 export type ReportSaveInput = z.infer<typeof reportSaveSchema>;

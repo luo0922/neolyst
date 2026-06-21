@@ -699,7 +699,13 @@ export async function createReport(
 /**
  * Save report content: upsert_report + update_report_doc_paths + update_model_path.
  * No more version snapshots.
+ *
+ * 防御性约束：所有直接 .update() 调用（不经 RPC 的字段：model_filename、chief_approval_path、
+ * source_path、source_filename）都附加 status 白名单过滤，禁止改动 published/terminated 报告。
+ * 这是 Server Action 层之外的最后一道防线（RPC 已通过 status 校验保护其覆盖的字段）。
  */
+const SAVE_CONTENT_ALLOWED_STATUSES = ["draft", "rejected", "submitted"] as const;
+
 export async function saveReportContent(
   params: SaveReportContentParams,
 ): Promise<Result<ReportDetail>> {
@@ -759,27 +765,32 @@ export async function saveReportContent(
     }
   } else if (params.model_filename !== undefined && params.model_filename !== null) {
     // 没传 model_path 但传了 model_filename：直接更新 filename 即可
+    // 防御：状态白名单过滤，禁止改动 published/terminated。
     const { error: modelFilenameError } = await supabase
       .from("report")
       .update({ model_filename: params.model_filename })
-      .eq("id", params.report_id);
+      .eq("id", params.report_id)
+      .in("status", SAVE_CONTENT_ALLOWED_STATUSES as unknown as string[]);
     if (modelFilenameError) {
       return err(modelFilenameError.message);
     }
   }
 
   // Step 4: update chief_approval_path
+  // 防御：状态白名单过滤，禁止改动 published/terminated。
   if (params.chief_approval_path) {
     const { error: chiefError } = await supabase
       .from("report")
       .update({ chief_approval_path: params.chief_approval_path })
-      .eq("id", params.report_id);
+      .eq("id", params.report_id)
+      .in("status", SAVE_CONTENT_ALLOWED_STATUSES as unknown as string[]);
     if (chiefError) {
       return err(chiefError.message);
     }
   }
 
   // Step 5: update source_path and source_filename
+  // 防御：状态白名单过滤，禁止改动 published/terminated。
   if (params.source_path !== undefined || params.source_filename !== undefined) {
     const updateData: Record<string, unknown> = {};
     if (params.source_path !== undefined) {
@@ -791,7 +802,8 @@ export async function saveReportContent(
     const { error: sourceError } = await supabase
       .from("report")
       .update(updateData)
-      .eq("id", params.report_id);
+      .eq("id", params.report_id)
+      .in("status", SAVE_CONTENT_ALLOWED_STATUSES as unknown as string[]);
     if (sourceError) {
       return err(sourceError.message);
     }

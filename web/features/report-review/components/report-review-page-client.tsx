@@ -26,6 +26,7 @@ export interface ReportReviewPageClientProps {
   currentSubmittedBy: string | null;
   currentAnalyst: string | null;
   analysts: Analyst[];
+  reportTypes: string[];
   currentUserId: string;
 }
 
@@ -98,6 +99,7 @@ export function ReportReviewPageClient({
   currentSubmittedBy,
   currentAnalyst,
   analysts,
+  reportTypes,
   currentUserId,
 }: ReportReviewPageClientProps) {
   const router = useRouter();
@@ -108,14 +110,13 @@ export function ReportReviewPageClient({
   const [submittedByFilter, setSubmittedByFilter] = React.useState(currentSubmittedBy ?? "");
   const [analystFilter, setAnalystFilter] = React.useState(currentAnalyst ?? "");
 
-  // Build analyst options for report_type dropdown
+  // Build report_type dropdown options from the full list of active report types
   const reportTypeOptions = React.useMemo(() => {
-    const types = [...new Set(reports.map((r) => r.report_type))];
     return [
       { value: "", label: "All types" },
-      ...types.map((t) => ({ value: t, label: t })),
+      ...reportTypes.map((t) => ({ value: t, label: t })),
     ];
-  }, [reports]);
+  }, [reportTypes]);
 
   React.useEffect(() => {
     setQueryDraft(currentQuery ?? "");

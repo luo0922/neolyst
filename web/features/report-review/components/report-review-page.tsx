@@ -2,6 +2,7 @@ import * as React from "react";
 
 import { requireAuth } from "@/lib/supabase/server";
 import { listAllActiveAnalysts } from "@/features/analyst-info/repo/analysts-repo";
+import { listReportTypeOptions } from "@/features/reports/repo/reports-repo";
 import type { Analyst } from "@/features/analyst-info/repo/analysts-repo";
 
 import { listReviewReportsAction } from "../actions";
@@ -34,7 +35,7 @@ export async function ReportReviewPage({ searchParams }: ReportReviewPageProps) 
   const currentUser = await requireAuth();
   const currentUserId = currentUser.id;
 
-  const [listResult, analystsResult] = await Promise.all([
+  const [listResult, analystsResult, reportTypesResult] = await Promise.all([
     listReviewReportsAction({
       page,
       query,
@@ -44,6 +45,7 @@ export async function ReportReviewPage({ searchParams }: ReportReviewPageProps) 
       analyst,
     }),
     listAllActiveAnalysts(),
+    listReportTypeOptions(),
   ]);
 
   if (!listResult.ok) {
@@ -57,6 +59,7 @@ export async function ReportReviewPage({ searchParams }: ReportReviewPageProps) 
   }
 
   const analysts = analystsResult.ok ? analystsResult.data : [];
+  const reportTypes = reportTypesResult.ok ? reportTypesResult.data : [];
 
   return (
     <ReportReviewPageClient
@@ -70,6 +73,7 @@ export async function ReportReviewPage({ searchParams }: ReportReviewPageProps) 
       currentSubmittedBy={contact_person}
       currentAnalyst={analyst}
       analysts={analysts}
+      reportTypes={reportTypes}
       currentUserId={currentUserId}
     />
   );
