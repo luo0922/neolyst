@@ -10,7 +10,7 @@ import { Input } from "@/components/ui/input";
 import { Pagination } from "@/components/ui/pagination";
 import { Select } from "@/components/ui/select";
 import { Table, TD, TH, THead, TR } from "@/components/ui/table";
-import { isReportTerminal } from "@/domain/schemas/report";
+import { isReportTerminal, type ReportStatus } from "@/domain/schemas/report";
 import type { ReportSummary } from "@/features/reports/repo/reports-repo";
 import type { Analyst } from "@/features/analyst-info/repo/analysts-repo";
 import { terminateReportAction } from "@/features/reports/actions";
