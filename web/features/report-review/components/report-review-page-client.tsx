@@ -281,6 +281,8 @@ export function ReportReviewPageClient({
             <TR>
               <TH className="w-full">Title</TH>
               <TH className="whitespace-nowrap">Type</TH>
+              <TH className="whitespace-nowrap">Rating</TH>
+              <TH className="whitespace-nowrap">Target price</TH>
               <TH className="whitespace-nowrap">Status</TH>
               <TH className="whitespace-nowrap">Owner</TH>
               <TH className="whitespace-nowrap">Submitter</TH>
@@ -292,15 +294,26 @@ export function ReportReviewPageClient({
           <tbody>
             {reports.length === 0 ? (
               <TR>
-                <TD colSpan={8} className="py-10 text-center text-[var(--fg-secondary)]">
+                <TD colSpan={10} className="py-10 text-center text-[var(--fg-secondary)]">
                   No reports found.
                 </TD>
               </TR>
             ) : (
-              reports.map((report) => (
+              reports.map((report) => {
+                const isCompanyReport =
+                  report.report_type === "company" ||
+                  report.report_type === "company_flash" ||
+                  report.report_type === "company-translate";
+                return (
                 <TR key={report.id}>
                   <TD className="font-medium text-[var(--fg-primary)]">{report.title}</TD>
                   <TD className="text-[var(--fg-secondary)]">{report.report_type}</TD>
+                  <TD className="text-[var(--fg-secondary)]">
+                    {isCompanyReport && report.rating ? report.rating : "-"}
+                  </TD>
+                  <TD className="text-[var(--fg-secondary)]">
+                    {isCompanyReport && report.target_price ? report.target_price : "-"}
+                  </TD>
                   <TD>
                     <Badge tone={statusTone(report.status)}>
                       {report.status}
@@ -330,7 +343,8 @@ export function ReportReviewPageClient({
                     </div>
                   </TD>
                 </TR>
-              ))
+                );
+              })
             )}
           </tbody>
         </Table>

@@ -68,7 +68,11 @@ function formatDateTime(iso: string): string {
 }
 
 function isCompanyType(reportType: string): boolean {
-  return reportType === "company" || reportType === "company_flash";
+  return (
+    reportType === "company" ||
+    reportType === "company_flash" ||
+    reportType === "company-translate"
+  );
 }
 
 function requiresSector(reportType: string): boolean {
@@ -668,7 +672,7 @@ export function EditReportPageClient({
             />
           ) : null}
 
-          {formReportType === "company" ? (
+          {isCompanyType(formReportType) ? (
             <>
               <Select
                 label="Rating"

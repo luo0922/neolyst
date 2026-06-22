@@ -47,7 +47,11 @@ function formatReportTypeLabel(value: string): string {
 }
 
 function isCompanyType(reportType: string): boolean {
-  return reportType === "company" || reportType === "company_flash";
+  return (
+    reportType === "company" ||
+    reportType === "company_flash" ||
+    reportType === "company-translate"
+  );
 }
 
 function requiresRegion(reportType: string): boolean {
@@ -563,7 +567,7 @@ export function NewReportPageClient({
             />
           ) : null}
 
-          {formReportType === "company" ? (
+          {isCompanyType(formReportType) ? (
             <>
               <Select
                 label="Rating"
